@@ -29,8 +29,6 @@
 1. **第三人称预览卡片里的玩家没有皮肤**。预览世界使用独立的连接，没有玩家列表，皮肤渲染器按 UUID 查不到皮肤；尝试过的两种方案（复用真实 profile、`RemotePlayer`、给 `getSkin()` 加 mixin 直接返回真实皮肤）均未成功，已全部回退；
 2. **"下一个锁定实例"（默认 `M`）行为待确认**。功能与按键分支均已接入，按下后日志应出现 `[seedqueue] play next lock: ...`；若没有任何日志或提示 `no locked ready entry`，需要在墙上先锁定一张已生成完成的卡片，并把日志反馈给作者；
 3. **预览世界不 tick**，因此远景以外的地形依赖预览范围（`chunkRadius`，默认 4）。调大能看得更远，但生成更慢、占用更高；
-4. **Sodium 0.9 为单例渲染器**，切换世界会重建 `RenderSectionManager`，换卡瞬间有重建开销；
-5. **Hermes 需要 MCSR 启动器加锁运行**，直接用普通启动器启动会被拒绝。
 
 ## 安装 / Install
 
@@ -75,8 +73,6 @@
 2. **"Play next lock" (default `M`) needs confirmation** — the action and its key branch exist; pressing
    it should log `[seedqueue] play next lock: ...`. Lock a fully generated card first and report the log.
 3. Previews only cover `chunkRadius` chunks (default 4); larger radii look further but generate slower.
-4. Sodium 0.9 keeps a single renderer, so switching cards costs a section-manager rebuild.
-5. Hermes only runs under the MCSR launcher lock.
 
 **Install**: drop the six jars into `mods/` (delete older versions first); Minecraft 26.3 + Fabric Loader
 0.19.5+, Sodium 0.9.3 recommended.
