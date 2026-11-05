@@ -210,7 +210,15 @@ public final class WallKeybindingsScreen extends Screen {
    @Override
    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
       if (this.editing != null) {
-         int key = com.mojang.blaze3d.platform.InputConstants.Type.MOUSE.getOrCreate(event.button()).getValue();
+         // 26.3 hands over SDL button numbers (1 = left, 2 = middle, 3 = right), while
+         // InputConstants and InputConstants.isKeyDown use GLFW's 0-based indices.
+         int mouseIndex = event.button() - 1;
+
+         if (mouseIndex < 0 || mouseIndex > 7) {
+            return true;
+         }
+
+         int key = com.mojang.blaze3d.platform.InputConstants.Type.MOUSE.getOrCreate(mouseIndex).getValue();
 
          if (this.mode == 0) {
             WallKeybindings.setPrimary(this.editing, key);

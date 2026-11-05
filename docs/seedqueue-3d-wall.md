@@ -297,6 +297,11 @@ SeedQueue 不再使用自定义的简易设置页，而是注册真正的 Speedr
 鼠标：左键 play、右键 lock、中键删除并补充一张。按键绑定持久化在 `config/seedqueue.json`
 的 `keyBindings` 字段（键名 `play/lock/reset/reset_all/focus_reset/quit`）。
 
+> 26.3 的鼠标按键来自 SDL，编号是 **1=左键、2=中键、3=右键**（不是 GLFW 的 0/1/2）。
+> `WallScreen.mouseClicked` 早期按 0/1/2 判断，导致"左键锁卡、右键无反应"；
+> 现在统一用 `BUTTON_LEFT/MIDDLE/RIGHT` 三个常量，侧键（SDL 4/5）直接忽略。
+> 键位设置界面录鼠标键时也用 `event.button() - 1` 转成 GLFW 索引后再存。
+
 **重置不会卡住渲染线程**：`discard()` 会 `halt` 服务端并等待其线程，如果服务端还在生成区块，
 在渲染线程直接调用会冻结整个墙（实测会卡死）。现在重置/删除都把 `discard` 丢到
 `QueueExecutors.prepare()` 后台执行，并立即 `refillQueue()` 补位——与 1.21.4 的

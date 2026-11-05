@@ -234,11 +234,20 @@ public final class WallScreen extends Screen {
       return hoveredEntry;
    }
 
+   // 26.3 delivers mouse buttons straight from SDL, which numbers them 1 = left, 2 = middle,
+   // 3 = right (GLFW/SDL2 style 0-based indices are not used any more). The old code assumed
+   // 0/1/2, so left click locked a card and right click did nothing.
+   private static final int BUTTON_LEFT = 1;
+   private static final int BUTTON_MIDDLE = 2;
+   private static final int BUTTON_RIGHT = 3;
+
    @Override
    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-      // Only left (join), right (lock) and middle (discard) do anything. Mouse side buttons used to
-      // fall through to the join branch below, so every side click started another world ("ghost").
-      if (event.button() < 0 || event.button() > 2) {
+      int button = event.button();
+
+      // Only left (join), right (lock) and middle (discard) do anything. Mouse side buttons (SDL 4/5,
+      // and anything above) are ignored so a side click never starts another world ("ghost").
+      if (button != BUTTON_LEFT && button != BUTTON_MIDDLE && button != BUTTON_RIGHT) {
          return false;
       }
 
@@ -248,12 +257,12 @@ public final class WallScreen extends Screen {
          if (event.x() >= bounds[0] && event.x() <= bounds[2] && event.y() >= bounds[1] && event.y() <= bounds[3]) {
             QueueEntry entry = this.cardEntries.get(i);
 
-            if (event.button() == 1) {
+            if (button == BUTTON_RIGHT) {
                this.toggleLock(entry);
                return true;
             }
 
-            if (event.button() == 2) {
+            if (button == BUTTON_MIDDLE) {
                SeedQueue.discardEntry(entry);
                SeedQueue.refillQueue(this.minecraft);
                return true;
@@ -299,11 +308,11 @@ public final class WallScreen extends Screen {
    }
 
    public boolean debugMiddleClickFirst() {
-      return this.debugClick(2);
+      return this.debugClick(BUTTON_MIDDLE);
    }
 
    public boolean debugClickFirst() {
-      return this.debugClick(0);
+      return this.debugClick(BUTTON_LEFT);
    }
 
    private boolean debugClick(int button) {
