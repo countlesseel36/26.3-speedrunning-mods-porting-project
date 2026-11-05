@@ -1,0 +1,7 @@
+{
+  "key.atum.reset": "创建新世界",
+  "key.category.atum.keys": "Atum",
+  "menu.autoresetTitle": "自动重置设置",
+  "menu.enterSeed": "种子（留空则随机）",
+  "menu.stop_resets": "停止重置并退出"
+}

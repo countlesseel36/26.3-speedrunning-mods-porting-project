@@ -1,0 +1,7 @@
+{
+  "key.atum.reset": "Create New World",
+  "key.category.atum.keys": "Atum",
+  "menu.autoresetTitle": "Autoreset Options",
+  "menu.enterSeed": "Seed (leave empty for a random seed)",
+  "menu.stop_resets": "Stop Resets & Quit"
+}

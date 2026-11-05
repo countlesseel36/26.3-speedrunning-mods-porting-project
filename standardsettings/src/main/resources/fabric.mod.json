@@ -1,0 +1,49 @@
+{
+	"schemaVersion": 1,
+	"id": "standardsettings",
+	"version": "2.3.0-beta.2+26.3",
+	"name": "StandardSettings",
+	"description": "Resets settings to a configured default at the start of a run. Ported to Minecraft 26.3 by the Chinese 1.16.2+ speedrunning community.",
+	"authors": [
+		{
+			"name": "contaria",
+			"contact": {
+				"homepage": "https://github.com/contariaa/"
+			}
+		},
+		"CountlessEel36"
+	],
+	"contributors": [
+		"tildejustin",
+		"Slackow",
+		"knawk",
+		"DesktopFolder",
+		"DuncanRuns",
+		"tesselslate",
+		"maskers"
+	],
+	"contact": {
+		"sources": "https://github.com/contariaa/StandardSettings",
+		"issues": "https://github.com/contariaa/StandardSettings/issues"
+	},
+	"license": "MIT",
+	"environment": "client",
+	"custom": {
+		"speedrunapi": {
+			"config": "me.contaria.standardsettings.StandardSettingsConfig"
+		}
+	},
+	"mixins": [
+		"standardsettings.mixins.json"
+	],
+	"accessWidener": "standardsettings.accesswidener",
+	"depends": {
+		"fabricloader": ">=0.16.0",
+		"minecraft": ">=26.3",
+		"java": ">=25",
+		"speedrunapi": ">=2.1-beta.1"
+	},
+	"breaks": {
+		"worldpreview": "<6.0-beta.1"
+	}
+}

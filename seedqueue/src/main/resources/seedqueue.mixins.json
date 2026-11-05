@@ -1,0 +1,39 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "me.contaria.seedqueue.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "me.contaria.seedqueue.SeedQueueMixinPlugin",
+  "client": [
+    "SeedQueueMixin",
+    "ScreenInvoker",
+    "TitleScreenMixin",
+    "IntegratedServerMixin",
+    "IntegratedServerParkMixin",
+    "WorldOpenFlowsMixin",
+    "KeyboardHandlerMixin",
+    "FrameGraphMixin",
+    "FrameGraphPassMixin",
+    "WallCaptureMixin",
+    "MinecraftDoWorldLoadMixin",
+    "MinecraftSetLevelMixin",
+    "MinecraftTickMixin",
+    "GuiSetScreenMixin",
+    "DisconnectDebugMixin",
+    "GameRendererResizeMixin",
+    "WallFpsMixin",
+    "LevelListMixin",
+    "DebugOverlayMixin",
+    "HudMixin",
+    "sodium.SodiumWorldRendererMixin",
+    "sodium.RenderSectionManagerMixin",
+    "sodium.ChunkBuilderMixin",
+    "sodium.ChunkMeshBufferBuilderMixin",
+    "sodium.ChunkJobResultMixin",
+    "sodium.SodiumRenderLayerMixin",
+    "sodium.UniformBufferAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

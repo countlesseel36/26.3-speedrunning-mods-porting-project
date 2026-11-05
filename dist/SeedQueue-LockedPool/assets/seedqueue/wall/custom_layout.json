@@ -1,0 +1,22 @@
+{
+  "main": {
+    "rows": 1,
+    "columns": 3,
+    "x": 0.02,
+    "y": 0.03,
+    "width": 0.96,
+    "height": 0.44,
+    "padding": 8
+  },
+  "locked": {
+    "rows": 1,
+    "columns": 4,
+    "x": 0.02,
+    "y": 0.55,
+    "width": 0.96,
+    "height": 0.38,
+    "padding": 6,
+    "instance_background": true
+  },
+  "replaceLockedInstances": true
+}

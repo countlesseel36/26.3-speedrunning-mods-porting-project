@@ -1,0 +1,11 @@
+{
+  "speedrunapi.gui.config.button": "模组配置",
+  "speedrunapi.gui.config.title": "Speedrun API - 模组配置",
+  "speedrunapi.gui.config.settings": "设置",
+  "speedrunapi.gui.config.noConfigs": "§7没有可配置的模组 :(",
+  "speedrunapi.gui.config.unavailable": "该配置当前不可用！",
+  "speedrunapi.gui.config.search": "搜索配置项",
+  "speedrunapi.gui.toast.error.title": "SpeedrunAPI 错误！",
+  "speedrunapi.gui.toast.error.description.load": "加载 %s 配置时遇到 %s，详情见日志。",
+  "speedrunapi.gui.toast.error.description.save": "保存 %s 配置时遇到 %s，详情见日志。"
+}

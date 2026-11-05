@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "fast_reset.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "MinecraftServerMixin",
+    "ServerChunkCacheMixin",
+    "MinecraftServerSaveMixin",
+    "PlayerListMixin"
+  ],
+  "client": [
+    "OptionsScreenMixin",
+    "PauseScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

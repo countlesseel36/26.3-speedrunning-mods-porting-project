@@ -1,0 +1,158 @@
+package me.contaria.standardsettings.options;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
+import com.google.gson.JsonPrimitive;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.Component;
+
+public class CustomStandardSetting<T> extends StandardSetting<T> {
+   private final Supplier<T> getter;
+   private final Consumer<T> setter;
+   private final Function<T, T> validator;
+   private final Function<JsonElement, T> fromJson;
+   private final Function<T, JsonElement> toJson;
+   private final Function<T, Component> textGetter;
+   private final Function<CustomStandardSetting<T>, AbstractWidget> mainWidgetCreator;
+   private T value;
+
+   public CustomStandardSetting(
+      String id,
+      String category,
+      Supplier<T> getter,
+      Consumer<T> setter,
+      Function<T, T> validator,
+      Function<JsonElement, T> fromJson,
+      Function<T, JsonElement> toJson,
+      Function<T, Component> textGetter,
+      Function<CustomStandardSetting<T>, AbstractWidget> mainWidgetCreator
+   ) {
+      super(id, category);
+      this.getter = getter;
+      this.setter = setter;
+      this.validator = validator;
+      this.toJson = toJson;
+      this.fromJson = fromJson;
+      this.textGetter = textGetter;
+      this.mainWidgetCreator = mainWidgetCreator;
+      this.set(this.getVanilla());
+   }
+
+   public T get() {
+      return this.value;
+   }
+
+   public void set(T value) {
+      this.value = this.validator.apply(value);
+   }
+
+   @Override
+   public T getVanilla() {
+      return this.getter.get();
+   }
+
+   @Override
+   public void setVanilla(T value) {
+      this.setter.accept(value);
+   }
+
+   @Override
+   protected void valueFromJson(JsonElement jsonElement) {
+      this.set(this.fromJson.apply(jsonElement));
+   }
+
+   @Override
+   protected JsonElement valueToJson() {
+      return this.toJson.apply(this.get());
+   }
+
+   @Override
+   public Component getDisplayText() {
+      return this.textGetter.apply(this.get());
+   }
+
+   @Override
+   public AbstractWidget createMainWidget() {
+      return this.mainWidgetCreator.apply(this);
+   }
+
+   public static CustomStandardSetting<Boolean> ofBoolean(String id, String category, Supplier<Boolean> getter, Consumer<Boolean> setter) {
+      return new CustomStandardSetting<>(
+         id,
+         category,
+         getter,
+         setter,
+         value -> value,
+         JsonElement::getAsBoolean,
+         JsonPrimitive::new,
+         CommonComponents::optionStatus,
+         setting -> CycleButton.onOffBuilder(setting.get()).displayOnlyValue().create(0, 0, 120, 20, setting.getName(), (button, value) -> setting.set(value))
+      );
+   }
+
+   public static CustomStandardSetting<String> ofString(
+      String id,
+      String category,
+      Supplier<String> getter,
+      Consumer<String> setter,
+      Function<String, Component> textGetter,
+      Function<CustomStandardSetting<String>, AbstractWidget> mainWidgetCreator
+   ) {
+      return ofString(id, category, getter, setter, value -> value, textGetter, mainWidgetCreator);
+   }
+
+   public static CustomStandardSetting<String> ofString(
+      String id,
+      String category,
+      Supplier<String> getter,
+      Consumer<String> setter,
+      Function<String, String> validator,
+      Function<String, Component> textGetter,
+      Function<CustomStandardSetting<String>, AbstractWidget> mainWidgetCreator
+   ) {
+      return new CustomStandardSetting<>(
+         id,
+         category,
+         getter,
+         setter,
+         validator,
+         json -> json.isJsonNull() ? null : json.getAsString(),
+         string -> (JsonElement)(string == null ? JsonNull.INSTANCE : new JsonPrimitive(string)),
+         textGetter,
+         mainWidgetCreator
+      );
+   }
+
+   public static <T extends Enum<T>> CustomStandardSetting<T> ofEnum(String id, String category, Supplier<T> getter, Consumer<T> setter, Class<T> type) {
+      Function<T, Component> textGetter = value -> Component.translatable("speedrunapi.config.standardsettings.option.perspective." + value.name());
+      return new CustomStandardSetting<>(
+         id,
+         category,
+         getter,
+         setter,
+         value -> value,
+         json -> {
+            String jsonString = json.getAsString();
+
+            for (T enumConstant : (T[])type.getEnumConstants()) {
+               if (enumConstant.name().equals(jsonString)) {
+                  return (T)enumConstant;
+               }
+            }
+
+            throw new IllegalArgumentException("Failed to parse enum value!");
+         },
+         value -> new JsonPrimitive(value.name()),
+         textGetter,
+         setting -> CycleButton.builder(textGetter, setting.get())
+            .withValues(type.getEnumConstants())
+            .displayOnlyValue()
+            .create(0, 0, 120, 20, setting.getName(), (button, value) -> setting.set(value))
+      );
+   }
+}

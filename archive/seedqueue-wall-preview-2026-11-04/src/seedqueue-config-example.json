@@ -1,0 +1,7 @@
+{
+  "queueSize": 2,
+  "chunkRadius": 4,
+  "useWall": true,
+  "autoQueue": true,
+  "showHud": true
+}

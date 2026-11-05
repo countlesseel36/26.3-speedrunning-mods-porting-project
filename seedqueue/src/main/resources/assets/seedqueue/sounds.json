@@ -1,0 +1,56 @@
+{
+  "play_instance": {
+    "sounds": [
+    ]
+  },
+  "lock_instance": {
+    "sounds": [
+      "seedqueue:lock_instance"
+    ]
+  },
+  "reset_instance": {
+    "sounds": [
+      "seedqueue:reset_instance"
+    ]
+  },
+  "reset_all": {
+    "sounds": [
+    ]
+  },
+  "reset_column": {
+    "sounds": [
+    ]
+  },
+  "reset_row": {
+    "sounds": [
+    ]
+  },
+  "schedule_join": {
+    "sounds": [
+    ]
+  },
+  "schedule_all": {
+    "sounds": [
+    ]
+  },
+  "scheduled_join_warning": {
+    "sounds": [
+    ]
+  },
+  "start_benchmark": {
+    "sounds": [
+    ]
+  },
+  "finish_benchmark": {
+    "sounds": [
+    ]
+  },
+  "open_wall": {
+    "sounds": [
+    ]
+  },
+  "bypass_wall": {
+    "sounds": [
+    ]
+  }
+}

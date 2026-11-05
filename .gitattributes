@@ -1,0 +1,17 @@
+# 统一换行，避免 Windows 下 CRLF 污染 diff
+* text=auto eol=lf
+
+# 二进制
+*.jar   binary
+*.zip   binary
+*.png   binary
+*.jpg   binary
+*.gif   binary
+*.ico   binary
+*.gz    binary
+*.mca   binary
+
+# PowerShell 脚本保持 CRLF，避免执行策略/解析差异
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf

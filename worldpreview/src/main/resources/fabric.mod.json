@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "worldpreview",
+  "version": "6.3.0-beta.31+26.3",
+  "name": "WorldPreview",
+  "description": "Shows a preview of the world while it is generating. Ported to Minecraft 26.3 by the Chinese 1.16.2+ speedrunning community.",
+  "authors": [
+    "Void_X_Walker",
+    "CountlessEel36"
+  ],
+  "license": "MIT",
+  "environment": "client",
+
+  "mixins": [
+    "worldpreview.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.0",
+    "minecraft": ">=26.3",
+    "java": ">=25"
+  }
+}

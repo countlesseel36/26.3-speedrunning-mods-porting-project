@@ -1,0 +1,42 @@
+# ── 本地上位目录里的大文件 / 运行产物，绝不提交 ──
+# 完整的 26.3 测试实例（含 Sodium/Lithium 等第三方 mod，约 1.8 GB）
+/minecraft/
+
+# 编译中间产物与冒烟日志
+/build/
+*.log
+hs_err_pid*.log
+replay_pid*.log
+
+# 游戏运行产物（若在仓库内运行过）
+/run/
+/logs/
+/crash-reports/
+/saves/
+/screenshots/
+/resourcepacks/*.zip
+/config/
+/mods/
+
+# IDE / 系统文件
+.idea/
+.vscode/
+*.iml
+*.class
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 本地 scratch
+/tmp/
+*.bak
+*.bak-*
+
+# 产物随 GitHub Release 发布，不进入源码仓库（dist/SeedQueue-LockedPool 是资源包源文件，保留）
+*.jar
+/dist/*.zip
+/dist/SeedQueue-LockedPool.zip
+!/build/libs/mixinextras.jar
+
+# 本地导出的 release 资产目录
+/release-assets/

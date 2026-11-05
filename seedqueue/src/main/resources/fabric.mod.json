@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "seedqueue",
+  "version": "0.9.0-beta.52+26.3",
+  "name": "SeedQueue",
+  "description": "Pre-generates worlds in the background and shows them on a wall screen. 26.3 port by the Chinese 1.16.2+ speedrunning community.",
+  "authors": ["contaria", "FloofX", "FiguiNL", "CountlessEel36"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["me.contaria.seedqueue.SeedQueue"]
+  },
+  "mixins": ["seedqueue.mixins.json"],
+  "custom": {
+    "speedrunapi": {
+      "config": "me.contaria.seedqueue.SeedQueueSpeedrunConfig"
+    }
+  },
+  "depends": {
+    "fabricloader": ">=0.19.0",
+    "minecraft": ">=26.3",
+    "java": ">=25",
+    "speedrunapi": ">=2.1-beta.1"
+  }
+}

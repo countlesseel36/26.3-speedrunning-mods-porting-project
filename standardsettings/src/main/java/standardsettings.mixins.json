@@ -1,0 +1,22 @@
+{
+  "required": true,
+  "package": "me.contaria.standardsettings.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "LevelLoadingScreenMixin",
+    "MinecraftMixin",
+    "OptionInstanceMixin",
+    "WindowMixin",
+    "accessors.CyclingButtonWidgetAccessor",
+    "accessors.OptionListAccessor",
+    "accessors.PieChartAccessor",
+    "accessors.SimpleOptionAccessor",
+    "fix.KeyboardHandlerMixin",
+    "fix.LanguageSelectionListMixin",
+    "fix.LanguageSelectScreenMixin",
+    "fix.ModelManagerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

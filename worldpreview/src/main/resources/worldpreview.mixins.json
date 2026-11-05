@@ -1,0 +1,32 @@
+﻿{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "me.voidxwalker.worldpreview.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "ClientPacketListenerAccessor",
+    "ClientPacketListenerMoveMixin",
+    "MinecraftRenderMixin",
+    "MinecraftFrameTailMixin",
+    "MinecraftServerMixin",
+    "WorldOpenFlowsMixin",
+    "CreateWorldScreenMixin",
+    "GameRendererMixin",
+    "GameRendererAccessor",
+    "SkyRendererMixin",
+    "GuiAccessor",
+    "GameRendererTargetMixin",
+    "GuiRendererMixin",
+    "LevelRendererDebugMixin",
+    "SodiumDrawDebugMixin",
+    "DebugScreenOverlayMixin",
+    "LevelExtractorMixin",
+    "LevelExtractorAccessor",
+    "LevelLoadingScreenMixin",
+    "GenericMessageScreenMixin",
+    "CameraAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
