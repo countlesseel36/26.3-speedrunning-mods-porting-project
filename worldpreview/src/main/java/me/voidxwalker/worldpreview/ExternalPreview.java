@@ -93,7 +93,9 @@ public final class ExternalPreview {
             overworld.getRespawnData().pos()
          );
          Connection connection = new Connection(PacketFlow.CLIENTBOUND);
-         GameProfile profile = new GameProfile(UUID.nameUUIDFromBytes("worldpreview".getBytes()), "Preview");
+         GameProfile profile = previewProfile(minecraft);
+         WorldPreview.previewSkin = minecraft.player == null ? null : minecraft.player.getSkin();
+         WorldPreview.previewSkinUuid = minecraft.player == null ? null : minecraft.player.getUUID();
          WorldSessionTelemetryManager telemetry = new WorldSessionTelemetryManager(
             net.minecraft.client.telemetry.TelemetryEventSender.DISABLED, false, Duration.ZERO, "", profile.id()
          );
@@ -151,7 +153,9 @@ public final class ExternalPreview {
 
          net.minecraft.world.entity.Entity cameraAnchor = null;
 
-         if (Boolean.getBoolean("worldpreview.thirdPerson")) {
+         // Wall previews are always first person: the offset camera looked past the generated chunks
+         // and left a black band at the bottom of the cards, whatever the player's perspective was.
+         if (false && Boolean.getBoolean("worldpreview.thirdPerson")) {
             LocalPlayer camera = gameMode.createPlayer(level, null, null, new ItemActivation());
 
             if (camera != null) {
@@ -297,6 +301,35 @@ public final class ExternalPreview {
       // Still compiling, but never hold a card longer than the timeout.
       long maxWait = Math.max(1000L, Long.getLong("seedqueue.cardSettleMaxMs", 3000L));
       return System.currentTimeMillis() - this.lastActivationAt >= maxWait;
+   }
+
+   /**
+    * Profile used for the preview player: the real one, so third-person cards show the player's skin.
+    * The PlayerInfo profile is handed over as-is (not copied) because SkinManager keys its cache by
+    * profile identity/properties; a copy never resolves to a skin.
+    */
+   static GameProfile previewProfile(Minecraft minecraft) {
+      try {
+         var real = minecraft.getGameProfile();
+
+         if (real != null) {
+            var connection = minecraft.getConnection();
+
+            if (connection != null) {
+               var info = connection.getPlayerInfo(real.id());
+
+               if (info != null && info.getProfile().properties().containsKey("textures")) {
+                  return info.getProfile();
+               }
+            }
+
+            return real;
+         }
+      } catch (Throwable t) {
+         WorldPreview.LOGGER.warn("[preview] could not read the local game profile", t);
+      }
+
+      return new GameProfile(UUID.nameUUIDFromBytes("worldpreview".getBytes()), "Preview");
    }
 
    public void activateSections() {
@@ -537,7 +570,9 @@ public final class ExternalPreview {
             overworld.getRespawnData().pos()
          );
          Connection connection = new Connection(PacketFlow.CLIENTBOUND);
-         GameProfile profile = new GameProfile(UUID.nameUUIDFromBytes("worldpreview".getBytes()), "Preview");
+         GameProfile profile = previewProfile(minecraft);
+         WorldPreview.previewSkin = minecraft.player == null ? null : minecraft.player.getSkin();
+         WorldPreview.previewSkinUuid = minecraft.player == null ? null : minecraft.player.getUUID();
          WorldSessionTelemetryManager telemetry = new WorldSessionTelemetryManager(
             net.minecraft.client.telemetry.TelemetryEventSender.DISABLED, false, Duration.ZERO, "", profile.id()
          );
@@ -595,7 +630,9 @@ public final class ExternalPreview {
 
          net.minecraft.world.entity.Entity cameraAnchor = null;
 
-         if (Boolean.getBoolean("worldpreview.thirdPerson")) {
+         // Wall previews are always first person: the offset camera looked past the generated chunks
+         // and left a black band at the bottom of the cards, whatever the player's perspective was.
+         if (false && Boolean.getBoolean("worldpreview.thirdPerson")) {
             LocalPlayer camera = gameMode.createPlayer(level, null, null, new ItemActivation());
 
             if (camera != null) {

@@ -205,6 +205,12 @@ public final class SeedQueue implements ClientModInitializer {
    }
 
    private static void frameSwapTick(Minecraft minecraft) {
+      // Respawning replaces the client level; rebuilding previews during that window caused a
+      // multi-second frame drop, so the rotation stays paused for a few seconds afterwards.
+      if (previewPauseTicks > 0) {
+         return;
+      }
+
       if (joinInProgress || handoffPreviewEntry != null) {
          // A join hand-off owns the client level right now (the preview world usually *is* the
          // joined world). Swapping another preview in here would replace the world the player just
@@ -946,7 +952,10 @@ public final class SeedQueue implements ClientModInitializer {
          }
 
          try {
-            System.setProperty("worldpreview.thirdPerson", String.valueOf("third_person".equals(QueueConfig.perspective)));
+            // Wall previews are always rendered first person: the third-person camera sat several blocks
+      // behind the player and the extra frustum area was never generated, which left a black band at
+      // the bottom of the cards. The player's own perspective no longer affects the wall.
+      System.setProperty("worldpreview.thirdPerson", "false");
 
          if (entry.externalPreview == null) {
                entry.externalPreview = me.voidxwalker.worldpreview.ExternalPreview.build(minecraft, entry.server, previewRadius(entry));
@@ -1557,6 +1566,15 @@ public final class SeedQueue implements ClientModInitializer {
 
    /** Opens the wall. Returns true when it was actually opened (false when it was already up). */
    public static boolean openWall(Minecraft minecraft) {
+      // Cards must always be first person: the third-person-back camera sits behind the player and
+      // looks at world that was never generated, leaving a black band. The preview renders through the
+      // global camera type, so it has to be forced while the wall owns the screen.
+      if (wallSavedCameraType == null) {
+         wallSavedCameraType = minecraft.options.getCameraType();
+      }
+
+      minecraft.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
+
       if (minecraft.gui.screen() instanceof WallScreen) {
          return false;
       }
@@ -1607,7 +1625,15 @@ public final class SeedQueue implements ClientModInitializer {
    }
 
    /** Called when the wall is closed: restores the game state and the screen it was opened from. */
+   /** Camera type stored when the wall was opened, restored when it closes. */
+   private static net.minecraft.client.CameraType wallSavedCameraType;
+
    public static void onWallClosed(Minecraft minecraft) {
+      if (wallSavedCameraType != null) {
+         minecraft.options.setCameraType(wallSavedCameraType);
+         wallSavedCameraType = null;
+      }
+
       LOGGER.info("[seedqueue] onWallClosed");
       joinInProgress = false;
       wallShown = false;
@@ -2084,7 +2110,10 @@ public final class SeedQueue implements ClientModInitializer {
                return;
             }
 
-            System.setProperty("worldpreview.thirdPerson", String.valueOf("third_person".equals(QueueConfig.perspective)));
+            // Wall previews are always rendered first person: the third-person camera sat several blocks
+      // behind the player and the extra frustum area was never generated, which left a black band at
+      // the bottom of the cards. The player's own perspective no longer affects the wall.
+      System.setProperty("worldpreview.thirdPerson", "false");
             entry.renderProperties = new me.voidxwalker.worldpreview.WorldPreviewProperties(
                entry.externalPreview.level,
                entry.externalPreview.listener,
@@ -2367,8 +2396,26 @@ public final class SeedQueue implements ClientModInitializer {
       LOGGER.info("[seedqueue] memory {}: heapUsed={}MB committed={}MB max={}MB", where, used, committed, max);
    }
 
+   /** Ticks for which the preview rotation is paused after the client switched level (respawn). */
+   private static int previewPauseTicks;
+   private static Object lastPauseLevel;
+
    public static void tick(Minecraft minecraft) {
       SodiumLevelCache.processPending();
+
+      // Respawning replaces the client level. Rebuilding every preview while the client rebuilds the
+      // world itself caused a multi-second frame drop, so pause the rotation for a moment.
+      if (minecraft.level != lastPauseLevel) {
+         lastPauseLevel = minecraft.level;
+
+         if (!joinInProgress) {
+            previewPauseTicks = Math.max(0, Integer.getInteger("seedqueue.respawnPauseTicks", 80));
+         }
+      }
+
+      if (previewPauseTicks > 0) {
+         previewPauseTicks--;
+      }
 
       // Whatever started the join (wall click, Atum gold boots, a queued reset), once the client owns
       // a level and a player the vanilla "Preparing world generation" screen has to go. It used to be

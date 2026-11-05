@@ -1,4 +1,4 @@
-{
+﻿{
   "speedrunapi.config.standardsettings.category.f3": "F3 Settings...",
   "speedrunapi.config.standardsettings.category.more": "More Settings...",
   "speedrunapi.config.standardsettings.category.onWorldJoin": "On World Join Settings...",
@@ -34,5 +34,7 @@
   "speedrunapi.config.standardsettings.option.sneaking": "Sneak Toggled",
   "speedrunapi.config.standardsettings.option.sprinting": "Sprint Toggled",
 
-  "options.chat.delay_instant": "Chat Delay"
+  "options.chat.delay_instant": "Chat Delay",
+  "speedrunapi.config.standardsettings.option.autoSuggestions": "Auto Suggestions",
+  "speedrunapi.config.standardsettings.option.backgroundForChatOnly": "Background For Chat Only"
 }

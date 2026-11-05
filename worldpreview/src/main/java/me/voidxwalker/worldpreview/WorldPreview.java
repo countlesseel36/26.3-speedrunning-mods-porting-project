@@ -841,6 +841,9 @@ public final class WorldPreview {
    }
 
    public static boolean hideDebugOverlay;
+   /** Real player's skin, reused by the preview player (it has no player list of its own). */
+   public static net.minecraft.world.entity.player.PlayerSkin previewSkin;
+   public static java.util.UUID previewSkinUuid;
    public static boolean levelDumped;
    public static boolean suppressDebugOverlay;
    public static boolean forceLevelRender;

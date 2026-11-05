@@ -193,14 +193,49 @@ public class SpeedrunConfigScreen extends Screen {
 
                if (!byOptions.equals(optionsKey)) {
                   name = byOptions;
-               } else if (id.startsWith("key_key.")) {
-                  // StandardSettings registers key bindings as "key_" + KeyMapping#getName(), e.g.
-                  // "key_key.playerList"; translate the underlying key instead of showing it raw.
-                  String mapping = id.substring("key_key.".length());
+               } else if (id.startsWith("key_") || id.startsWith("key.")) {
+                  // Ids come in several shapes ("key_key.playerlist", "key.key.debug.copyLocation"},
+                  // because the port prefixes the mapping name again. Strip the "key"/"key_" prefixes
+                  // until only the mapping name is left, then translate that.
+                  String mapping = id;
+
+                  for (int guard = 0; guard < 4; guard++) {
+                     if (mapping.startsWith("key_")) {
+                        mapping = mapping.substring("key_".length());
+                     } else if (mapping.startsWith("key.")) {
+                        mapping = mapping.substring("key.".length());
+                     } else {
+                        break;
+                     }
+                  }
+
                   String translated = net.minecraft.locale.Language.getInstance().getOrDefault(mapping);
-                  name = translated.equals(mapping) ? pretty(id) : translated;
+
+                  if (translated.equals(mapping)) {
+                     // Debug mappings are named "debug.<name>"; the trailing part is the readable one.
+                     String trailing = mapping.substring(mapping.lastIndexOf('.') + 1);
+                     String byTrailing = net.minecraft.locale.Language.getInstance()
+                        .getOrDefault("key.debug." + trailing);
+                     name = byTrailing.equals("key.debug." + trailing) ? pretty(trailing) : byTrailing;
+                  } else {
+                     name = translated;
+                  }
                } else {
-                  name = pretty(id);
+                  // Debug toggles carry ids like "debug.minecraft:looking_at_entity"; the vanilla list
+                  // shows just "looking_at_entity", so drop the namespace before prettifying.
+                  String bare = id;
+
+                  if (bare.startsWith("debug.")) {
+                     bare = bare.substring("debug.".length());
+                  }
+
+                  int colon = bare.indexOf(':');
+
+                  if (colon >= 0) {
+                     bare = bare.substring(colon + 1);
+                  }
+
+                  name = pretty(bare);
                }
             }
          }

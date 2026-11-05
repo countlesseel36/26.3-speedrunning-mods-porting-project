@@ -32,7 +32,8 @@ public final class WallKeybindingsScreen extends Screen {
 
    @Override
    public boolean isPauseScreen() {
-      return false;
+      // Pause like the vanilla options screens so rebinding does not run the world behind the menu.
+      return true;
    }
 
    @Override
@@ -53,21 +54,9 @@ public final class WallKeybindingsScreen extends Screen {
          chord.setTooltip(Tooltip.create(Component.translatable("seedqueue.menu.keys.primary")));
          this.addRenderableWidget(chord);
 
-         Button secondary = Button.builder(
-               Component.literal("+ " + WallKeybindings.binding(action).secondary.size()), button -> this.edit(action, 1)
-            )
-            .bounds(center + 55, y, 45, 20)
-            .build();
-         secondary.setTooltip(this.keysTooltip("secondary", WallKeybindings.binding(action).secondary));
-         this.addRenderableWidget(secondary);
-
-         Button blocking = Button.builder(
-               Component.literal("- " + WallKeybindings.binding(action).blocking.size()), button -> this.edit(action, 2)
-            )
-            .bounds(center + 105, y, 45, 20)
-            .build();
-         blocking.setTooltip(this.keysTooltip("blocking", WallKeybindings.binding(action).blocking));
-         this.addRenderableWidget(blocking);
+         // Combination (secondary) and blocking keys were removed: the SDL input path could not report
+         // modifier state, so those columns only ever produced bindings that did not fire. The screen
+         // now edits a single key per action.
       }
 
       this.addRenderableWidget(
@@ -161,40 +150,10 @@ public final class WallKeybindingsScreen extends Screen {
          return true;
       }
 
-      if (this.mode == 0) {
-         // Modifiers held while binding become the combination keys (Shift+Key etc.).
-         List<Integer> secondary = new ArrayList<>();
-
-         if ((event.modifiers() & 1) != 0) {
-            secondary.add(com.mojang.blaze3d.platform.InputConstants.KEY_LSHIFT);
-         }
-
-         if ((event.modifiers() & 2) != 0) {
-            secondary.add(com.mojang.blaze3d.platform.InputConstants.KEY_LCONTROL);
-         }
-
-         if ((event.modifiers() & 4) != 0) {
-            secondary.add(com.mojang.blaze3d.platform.InputConstants.KEY_LALT);
-         }
-
-         secondary.remove(Integer.valueOf(key));
-         WallKeybindings.setPrimary(this.editing, key);
-         WallKeybindings.setSecondary(this.editing, secondary);
-      } else {
-         List<Integer> keys = new ArrayList<>(this.mode == 1
-            ? WallKeybindings.binding(this.editing).secondary
-            : WallKeybindings.binding(this.editing).blocking);
-
-         if (!keys.remove(Integer.valueOf(key))) {
-            keys.add(key);
-         }
-
-         if (this.mode == 1) {
-            WallKeybindings.setSecondary(this.editing, keys);
-         } else {
-            WallKeybindings.setBlocking(this.editing, keys);
-         }
-      }
+      // Combination and blocking keys were removed; every action is a single key now.
+      WallKeybindings.setPrimary(this.editing, key);
+      WallKeybindings.setSecondary(this.editing, List.of());
+      WallKeybindings.setBlocking(this.editing, List.of());
 
       this.finishEdit();
       return true;

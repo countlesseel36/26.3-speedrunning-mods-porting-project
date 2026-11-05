@@ -63,8 +63,9 @@ public final class WallKeybindings {
       DEFAULTS.put(Action.CANCEL_BENCHMARK, new Binding(InputConstants.KEY_N));
       DEFAULTS.put(Action.QUIT, new Binding(InputConstants.KEY_ESCAPE));
       resetDefaults();
-      // 1.21.4 default for "Play Next Lock" is Shift + M.
-      BINDINGS.get(Action.PLAY_NEXT_LOCK).secondary.add(InputConstants.KEY_LSHIFT);
+      // "Play Next Lock" is a single key (M). Combination keys were removed because the SDL input
+      // path could not report modifier state, which made Shift + M silently dead.
+      BINDINGS.get(Action.PLAY_NEXT_LOCK).secondary.clear();
    }
 
    private WallKeybindings() {
@@ -100,38 +101,54 @@ public final class WallKeybindings {
       }
    }
 
+   /**
+    * Modifier keys through the GUI's own state. {@code InputConstants.isKeyDown} reads the window key
+    * state, which does not report SDL modifiers, so Shift+M never saw Shift as held.
+    */
+   private static boolean modifierDown(int key) {
+      // Input is SDL in 26.3, so modifiers have to be read from SDL (the game itself does this when it
+      // builds MouseButtonInfo). InputConstants.isKeyDown only knows the keyboard state.
+      int mods = org.lwjgl.sdl.SDLKeyboard.SDL_GetModState();
+
+      if (key == InputConstants.KEY_LSHIFT || key == InputConstants.KEY_RSHIFT) {
+         return (mods & 0x0003) != 0;
+      }
+
+      if (key == InputConstants.KEY_LCONTROL || key == InputConstants.KEY_RCONTROL) {
+         return (mods & 0x00C0) != 0;
+      }
+
+      if (key == InputConstants.KEY_LALT || key == InputConstants.KEY_RALT) {
+         return (mods & 0x0300) != 0;
+      }
+
+      return false;
+   }
+
+   /** Compares stored and reported keys, ignoring the upper case shift produces ('M' vs 'm'). */
+   private static boolean sameKey(int stored, int reported) {
+      if (stored == reported) {
+         return true;
+      }
+
+      char a = (char) stored;
+      char b = (char) reported;
+      return Character.isLetter(a) && Character.isLetter(b) && Character.toLowerCase(a) == Character.toLowerCase(b);
+   }
+
    /** Returns the action this key event triggers, checking secondary and blocking keys. */
    public static Action match(KeyEvent event) {
       for (Map.Entry<Action, Binding> entry : BINDINGS.entrySet()) {
          Binding binding = entry.getValue();
 
-         if (binding.primary == UNKNOWN || binding.primary != event.key()) {
+         if (binding.primary == UNKNOWN || !sameKey(binding.primary, event.key())) {
             continue;
          }
 
-         boolean down = true;
-
-         for (int key : binding.secondary) {
-            if (!InputConstants.isKeyDown(key)) {
-               down = false;
-               break;
-            }
-         }
-
-         if (!down) {
-            continue;
-         }
-
-         for (int key : binding.blocking) {
-            if (InputConstants.isKeyDown(key)) {
-               down = false;
-               break;
-            }
-         }
-
-         if (down) {
-            return entry.getKey();
-         }
+         // Chord (secondary) and blocking keys were removed: the SDL input path could not report
+         // modifier state reliably, so a binding either fired only with its modifier held or never.
+         // A binding is now just its primary key.
+         return entry.getKey();
       }
 
       return null;
