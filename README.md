@@ -28,8 +28,8 @@ Everything is compiled on the local machine against the 26.3 jar + Fabric Loader
 
 | 模块 Module | 原版本 Upstream | 26.3 产物 Artifact | 状态 Status |
 | --- | --- | --- | --- |
-| `seedqueue` | 0.14.2+1.21.4 | `0.9.0-beta.53+26.3-SeedQueue.jar` | ✅ 实机验证 tested |
-| `worldpreview` | 6.3.1-beta.3+1.21.4 | `6.3.0-beta.31+26.3-WorldPreview.jar` | ✅ 实机验证 tested |
+| `seedqueue` | 0.14.2+1.21.4 | `0.9.0-beta.60+26.3-SeedQueue.jar` | ✅ 实机验证 tested |
+| `worldpreview` | 6.3.1-beta.3+1.21.4 | `6.3.0-beta.35+26.3-WorldPreview.jar` | ✅ 实机验证 tested |
 | `speedrunapi` | 2.1-beta.1+1.21.4 | `2.1.0-beta.8+26.3-Speedrun-API.jar` | ✅ 重写完成 rewritten |
 | `atum` | 1.3.4+1.21.9-1.21.10 | `1.4.0-beta.4+26.3-Atum.jar` | ✅ 实机验证 tested |
 | `fast-reset` | 1.5.1+1.21.9-1.21.10 | `1.6.0-beta.3+26.3-FastReset.jar` | ✅ 实机验证 tested |
@@ -224,7 +224,7 @@ excluded by `.gitignore` and published as release assets.*
 #    create an empty repository on GitHub first (no README/.gitignore)
 powershell -ExecutionPolicy Bypass -File .\tools\publish-github.ps1 `
     -RepoUrl https://github.com/<user>/<repo>.git `
-    -CommitMessage "26.3 port: SeedQueue 0.9.0-beta.53 / WorldPreview 6.3.0-beta.31"
+    -CommitMessage "26.3 port: SeedQueue 0.9.0-beta.60 / WorldPreview 6.3.0-beta.35"
 
 # 2) 打 tag 并创建 Release，把 dist 里的 6 个 jar + 资源包作为附件
 #    tag + release, attaching the six jars and the resource pack from dist/

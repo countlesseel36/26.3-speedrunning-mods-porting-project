@@ -82,6 +82,14 @@ public final class WallLayout {
          this.cosmetic = cosmetic;
       }
 
+      /** Same placement, different grid size (used so the pack cannot override rows/columns). */
+      private Group withGrid(int newRows, int newColumns) {
+         return new Group(
+            newRows, newColumns, this.x, this.y, this.width, this.height, this.padding, null,
+            this.instanceBackground, this.cosmetic
+         );
+      }
+
       public List<Slot> resolve(int screenWidth, int screenHeight) {
          if (this.positions != null) {
             return this.positions;
@@ -156,6 +164,16 @@ public final class WallLayout {
          try (InputStream in = resource.get().open()) {
             JsonObject json = JsonParser.parseString(new String(in.readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
             Group main = json.has("main") ? parseGroup(json.getAsJsonObject("main")) : defaults().main;
+
+            // The layout only positions the main grid; how many cards fit must still follow the
+            // rows/columns settings, otherwise enabling the resource pack silently pinned the wall to
+            // whatever grid the pack shipped (looked like "the setting does nothing").
+            if (main != null && main.positions == null) {
+               main = main.withGrid(
+                  Math.max(1, Math.min(4, QueueConfig.rows)),
+                  Math.max(1, Math.min(4, QueueConfig.columns))
+               );
+            }
             List<Group> preparing = new ArrayList<>();
 
             if (json.has("preparing")) {

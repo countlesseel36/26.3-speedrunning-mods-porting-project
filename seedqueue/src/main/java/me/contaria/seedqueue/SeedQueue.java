@@ -406,6 +406,12 @@ public final class SeedQueue implements ClientModInitializer {
 
       long now = System.currentTimeMillis();
 
+      // While the card's sections are being re-sent / recompiled the frame is incomplete (terrain
+      // pops in white). Keep the previous frame instead of copying it.
+      if (entry.externalPreview != null && !entry.externalPreview.settled()) {
+         return;
+      }
+
       try {
          if (entry.displayTarget != null) {
             // The preview camera is static, so an unchanged chunk count means the frame is identical
@@ -1483,7 +1489,20 @@ public final class SeedQueue implements ClientModInitializer {
       me.voidxwalker.worldpreview.WorldPreview.releasePreviewCameraAndEntities(minecraft);
       TimerCompat.stop();
       stopPreviewCycle(minecraft);
-      me.voidxwalker.worldpreview.WorldPreview.hideDebugOverlay = false;
+      // The cached preview section graphs were built before this world was bound to the client; they
+      // no longer match the chunks, which showed up as cards with missing terrain after F6.
+      evictPreviewCaches("returned to the wall");
+      // Entries that were just joined no longer hold an externalPreview, so the loop above can miss
+      // their manager. Clear everything that is not the world we are leaving: those graphs belong to
+      // a client state that no longer exists and render as holes / flickering sections.
+      SodiumLevelCache.evictAllExcept(minecraft.level);
+
+      for (QueueEntry entry : ENTRIES) {
+         if (entry.externalPreview != null) {
+            entry.externalPreview.invalidateSections();
+         }
+      }
+
       wallReturnScreen = null;
       wallShown = true;
       wallTicks = 0;
@@ -1597,6 +1616,14 @@ public final class SeedQueue implements ClientModInitializer {
       benchmarkFinishedAt = 0;
       stopPreviewCycle(minecraft);
       me.voidxwalker.worldpreview.WorldPreview.hideDebugOverlay = false;
+      // Leaving the wall drops the queued worlds: their preview levels and Sodium arenas are the
+      // biggest resident allocations, and reusing them after a join produced the unrendered cards.
+      int dropped = resetAllUnlocked();
+      SodiumLevelCache.evictAllExcept(minecraft.level);
+
+      if (dropped > 0) {
+         LOGGER.info("[seedqueue] wall closed: discarded {} previewed worlds", dropped);
+      }
       net.minecraft.client.gui.screens.Screen back = wallReturnScreen;
       wallReturnScreen = null;
 
@@ -2303,6 +2330,8 @@ public final class SeedQueue implements ClientModInitializer {
 
 
    private static int timerLogTicks = -1;
+   /** Chunk radius the current previews were built with; a change invalidates their section graph. */
+   private static int previewRadiusBuilt = -1;
    private static int timerFinishTicks = -1;
    private static boolean resizeSmokeDone;
    private static int keysSmokeStage;
@@ -2340,6 +2369,33 @@ public final class SeedQueue implements ClientModInitializer {
 
    public static void tick(Minecraft minecraft) {
       SodiumLevelCache.processPending();
+
+      // Whatever started the join (wall click, Atum gold boots, a queued reset), once the client owns
+      // a level and a player the vanilla "Preparing world generation" screen has to go. It used to be
+      // dismissed only on the wall join path, so the gold-boots join from the title screen sat on that
+      // screen forever while the world was already rendering behind it.
+      if (minecraft.level != null
+         && minecraft.player != null
+         && minecraft.gui.screen() instanceof net.minecraft.client.gui.screens.LevelLoadingScreen) {
+         LOGGER.info("[seedqueue] dismissing the loading screen (world and player are ready)");
+         minecraft.gui.setScreen(null);
+      }
+
+      // Cards are a copy of the main render target, so the vanilla F3 overlay ended up inside them.
+      // While the wall owns the screen the overlay stays hidden; the wall draws its own debug panel.
+      if (minecraft.gui.screen() instanceof WallScreen) {
+         me.voidxwalker.worldpreview.WorldPreview.hideDebugOverlay = true;
+      }
+
+      // A preview's section graph is sized from the chunk radius it was built with. Changing the
+      // radius at runtime left the old graph in place, so areas outside it stayed unrendered.
+      if (previewRadiusBuilt != QueueConfig.chunkRadius) {
+         if (previewRadiusBuilt != -1) {
+            evictPreviewCaches("chunk radius " + previewRadiusBuilt + " -> " + QueueConfig.chunkRadius);
+         }
+
+         previewRadiusBuilt = QueueConfig.chunkRadius;
+      }
 
 
       if (suppressLoadingScreens) {
@@ -3190,6 +3246,29 @@ public final class SeedQueue implements ClientModInitializer {
     * Called when a fresh world is about to be created (Atum resets). Returns true when a queued
     * world was opened instead, in which case the caller must cancel the fresh world creation.
     */
+   /**
+    * Drops the cached Sodium section managers of every queued preview.
+    *
+    * <p>Their section graph is sized from the chunk radius and from the packets that were applied when
+    * it was built. After the radius changes - or after the client rendered a real world between two
+    * wall visits - the cached graph no longer matches the level, and whole areas of the card stay
+    * unrendered. Destroying the managers makes Sodium rebuild them from scratch.</p>
+    */
+   public static void evictPreviewCaches(String reason) {
+      int evicted = 0;
+
+      for (QueueEntry entry : ENTRIES) {
+         if (entry.externalPreview != null && entry.externalPreview.level != null) {
+            SodiumLevelCache.evictLater(entry.externalPreview.level);
+            // The rebuilt manager has an empty chunk tracker: force the snapshot to be re-applied.
+            entry.externalPreview.invalidateSections();
+            evicted++;
+         }
+      }
+
+      LOGGER.info("[seedqueue] evicting {} preview section managers ({})", evicted, reason);
+   }
+
    public static boolean consumeForReset(Minecraft minecraft) {
       if (!integrate()) {
          return false;

@@ -241,6 +241,64 @@ public final class ExternalPreview {
     * client is rendering. Injecting chunks earlier leaves Sodium's {@code ChunkTracker} empty (its
     * global renderer is still bound to another level), so no terrain is ever built.
     */
+   /**
+    * Drops the "this snapshot is already inside Sodium" state.
+    *
+    * <p>{@link #activateSections()} only re-sends chunk packets while {@code chunksApplied} is false.
+    * When the section manager is destroyed and rebuilt (chunk radius change, returning to the wall,
+    * leaving the wall) the new manager starts with an empty tracker, so the flag has to be reset or the
+    * card keeps showing an empty graph - the unrendered areas after F6.</p>
+    */
+   public void invalidateSections() {
+      this.chunksApplied = false;
+      this.packetCursor = 0;
+      this.lastActivationAt = System.currentTimeMillis();
+   }
+
+   /** Timestamp of the last chunk re-application; cards stay on their previous frame until settled. */
+   private long lastActivationAt;
+   private long completeSince;
+
+   /**
+    * True when Sodium reports the preview's terrain as completely built.
+    *
+    * <p>Cards copy the frame from the main render target, so capturing while sections are still being
+    * compiled puts half-built terrain (white blocks) into the card. Waiting for the completion flag
+    * keeps the previous frame up until the rebuild really is done, instead of guessing with a timeout.
+    * {@code seedqueue.cardSettleMs} stays as an upper bound: if the flag never settles (or Sodium is
+    * absent) the card is released after that long anyway so it can never freeze forever.</p>
+    */
+   public boolean settled() {
+      if (!this.chunksApplied) {
+         return false;
+      }
+
+      Boolean complete = SodiumCompat.terrainComplete();
+      long now = System.currentTimeMillis();
+
+      if (Boolean.TRUE.equals(complete)) {
+         // "Complete" only means Sodium has no further section updates queued; the vertex uploads for
+         // the last ones may still be in flight, and copying that frame is what shows up as white
+         // patches. Require the flag to have been stable for a moment before releasing the card.
+         if (this.completeSince == 0L) {
+            this.completeSince = now;
+         }
+
+         return now - this.completeSince >= Math.max(0L, Long.getLong("seedqueue.cardCompleteDelayMs", 80L));
+      }
+
+      this.completeSince = 0L;
+
+      if (complete == null) {
+         // No Sodium information: fall back to the short settle window.
+         return System.currentTimeMillis() - this.lastActivationAt >= Math.max(0L, Long.getLong("seedqueue.cardSettleMs", 260L));
+      }
+
+      // Still compiling, but never hold a card longer than the timeout.
+      long maxWait = Math.max(1000L, Long.getLong("seedqueue.cardSettleMaxMs", 3000L));
+      return System.currentTimeMillis() - this.lastActivationAt >= maxWait;
+   }
+
    public void activateSections() {
       int centerSectionY = this.spawn.getY() >> 4;
       // Re-bind Sodium first: the renderer may have been restored to another level in between,
@@ -274,6 +332,7 @@ public final class ExternalPreview {
 
          if (this.packetCursor >= this.packets.size()) {
             this.chunksApplied = true;
+            this.lastActivationAt = System.currentTimeMillis();
             SodiumCompat.refreshTerrain();
          }
       } else {

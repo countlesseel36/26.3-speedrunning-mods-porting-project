@@ -19,7 +19,16 @@ import net.minecraft.client.multiplayer.ClientLevel;
  * <p>This cache is only touched from the render thread (Sodium's level binding happens there).</p>
  */
 public final class SodiumLevelCache {
-   private static final int MAX_MANAGERS = 6;
+   // One manager at a time - deliberately.
+   //
+   // Sodium's vertex arenas are allocated per device and shared between managers, but each manager
+   // owns its render lists. Keeping several managers alive meant one manager could resize or evict an
+   // arena while another one still had that range in its render list: the GPU then drew garbage
+   // polygons, which is exactly the region that flickers white in the cards (and the missing
+   // "GL_OUT_OF_MEMORY" buffers behind the titles-screen hang). Holding a single manager makes the
+   // cache behave like vanilla Sodium again - a level switch destroys the previous manager - at the
+   // cost of recompiling a preview when the wall switches cards.
+   private static final int MAX_MANAGERS = 1;
    // These are reached from the background queue thread (marking previews, queueing evictions) and
    // from the render thread (binding levels, pumping evictions). Plain IdentityHashMap based
    // collections are not safe for that: concurrent add/get can corrupt them and spin forever, which
@@ -96,6 +105,15 @@ public final class SodiumLevelCache {
          SeedQueue.LOGGER.info(
             "[seedqueue] sodium: queued eviction for level {} (cache={})", System.identityHashCode(level), MANAGERS.size()
          );
+      }
+   }
+
+   /** Queues every preview manager except {@code keep} for destruction (frees GPU arenas). */
+   public static void evictAllExcept(ClientLevel keep) {
+      for (ClientLevel level : new ArrayList<>(MANAGERS.keySet())) {
+         if (level != keep) {
+            evictLater(level);
+         }
       }
    }
 
