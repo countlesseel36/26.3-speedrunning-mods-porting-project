@@ -229,14 +229,16 @@ powershell -ExecutionPolicy Bypass -File .\tools\publish-github.ps1 `
 # 2) 打 tag 并创建 Release，把 dist 里的 6 个 jar + 资源包作为附件
 #    tag + release, attaching the six jars and the resource pack from dist/
 powershell -ExecutionPolicy Bypass -File .\tools\publish-github.ps1 `
-    -RepoUrl https://github.com/<user>/<repo>.git -Release v0.9.0-beta.53
+    -RepoUrl https://github.com/<user>/<repo>.git -Release mods_update_v0.1.0
 ```
 
-没有 `gh` CLI 时，直接在 GitHub 网页上 **Releases → Draft a new release**，tag 填 `v0.9.0-beta.52`，
-把 `dist/` 里的文件拖进 Assets 即可。
+没有 `gh` CLI 时，直接在 GitHub 网页上 **Releases → Draft a new release**：标题写 `26.3 port mods update vX.Y.Z`、
+tag 用 `mods_update_vX.Y.Z`，说明以 `# 26.3 Speedrun Mods — vX.Y.Z` 开头并附一段 English，
+然后把 `dist/` 里的文件拖进 Assets。
 
-*Without the `gh` CLI, use **Releases → Draft a new release** on GitHub, tag `v0.9.0-beta.52`, and drag the
-files from `dist/` into the assets area.*
+*Without the `gh` CLI, use **Releases → Draft a new release** on GitHub: title `26.3 port mods update vX.Y.Z`,
+tag `mods_update_vX.Y.Z`, notes starting with `# 26.3 Speedrun Mods — vX.Y.Z` plus an English section,
+then drag the files from `dist/` into the assets area.*
 
 `.gitignore` 已排除 `minecraft/`（约 1.8 GB 的测试实例，含第三方 mod）与 `build/`，
 实际提交约 300 个文件 / 25 MB（其中 19 MB 是 `docs/` 里的截图）。
