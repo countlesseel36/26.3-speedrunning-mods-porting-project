@@ -474,7 +474,10 @@ public final class WallScreen extends Screen {
          imageWidth = Math.max(1, Math.round(availableHeight * 16.0F / 9.0F));
       }
 
-      int imageX = x + (cardWidth - imageWidth) / 2;
+      // Seamless wall: the preview fills the whole card slot, no letterbox and no background band.
+      int imageX = x;
+      imageWidth = cardWidth;
+      imageHeight = cardHeight;
 
       if (entry != null) {
          this.cardBounds.add(new int[] { x, y, x + cardWidth, y + cardHeight });
@@ -488,11 +491,6 @@ public final class WallScreen extends Screen {
          }
       }
 
-      if (entry == null && slot.instanceBackground && this.textures.instanceBackground != null) {
-         this.textures.instanceBackground.blit(graphics, x, y, x + cardWidth, y + cardHeight);
-      } else {
-         graphics.fill(x, y, x + cardWidth, y + cardHeight, 0xFF0E0E0E);
-      }
 
       if (entry != null && entry.displayTarget != null) {
          float srcAspect = entry.displayTarget.height == 0
@@ -524,9 +522,10 @@ public final class WallScreen extends Screen {
          graphics.fill(imageX, y, imageX + imageWidth, y + imageHeight, 0xFF1A1A1A);
       }
 
-      graphics.fill(imageX, y + imageHeight, imageX + imageWidth, y + cardHeight, 0xFF1B1B1B);
 
-      if (entry != null) {
+      // The state line ("generating" / "ready" and the chunk counter) is only shown when the chunk
+      // progress option is enabled; by default the wall stays free of progress text.
+      if (entry != null && QueueConfig.showChunkProgress) {
          String label = stateLabel(entry.state);
 
          if (entry.state != QueueEntry.State.READY && entry.chunksTotal > 0) {
@@ -634,6 +633,20 @@ public final class WallScreen extends Screen {
       long usedMemory = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024L * 1024L);
       graphics.text(this.font, "fps " + fps + "  cards " + this.cardEntries.size(), x, y + graphHeight + 3, 0xFFCCCCCC);
       graphics.text(this.font, "mem " + usedMemory + " MB  sodium " + SodiumLevelCache.size(), x, y + graphHeight + 12, 0xFFCCCCCC);
+
+      // Status block (top left), mirroring the classic SeedQueue HUD: queue usage, memory and state.
+      long maxMemory = Runtime.getRuntime().maxMemory() / (1024L * 1024L);
+      int memoryPercent = maxMemory > 0 ? (int)Math.round(usedMemory * 100.0 / maxMemory) : 0;
+      int generating = SeedQueue.generatingCount();
+      graphics.text(
+         this.font,
+         "SeedQueue " + this.cardEntries.size() + "/" + QueueConfig.queueSize + " | generating " + generating,
+         8,
+         8,
+         0xFFFFFFFF
+      );
+      graphics.text(this.font, "Heap " + usedMemory + " MiB | M " + memoryPercent + "%", 8, 19, 0xFFFFFFFF);
+      graphics.text(this.font, generating > 0 ? "Generating seeds" : "Idle", 8, 30, 0xFFFFFFFF);
    }
 
    private static String stateLabel(QueueEntry.State state) {

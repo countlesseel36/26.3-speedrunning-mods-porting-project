@@ -18,6 +18,11 @@ public final class QueueConfig {
    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
    public static int queueSize = 3;
    public static int chunkRadius = 4;
+   /** Shows "generated/total" chunk progress on the cards; hidden by default. */
+   public static boolean showChunkProgress = false;
+   /** Preview render resolution; 0 = use the real window size. */
+   public static int simulatedWidth = 0;
+   public static int simulatedHeight = 0;
    public static boolean useWall = true;
    public static boolean autoQueue = true;
    public static boolean showHud = true;
@@ -101,6 +106,9 @@ public final class QueueConfig {
          JsonObject json = GSON.fromJson(Files.readString(path), JsonObject.class);
          queueSize = clamp(json.has("queueSize") ? json.get("queueSize").getAsInt() : queueSize, 1, 6);
          chunkRadius = clamp(json.has("chunkRadius") ? json.get("chunkRadius").getAsInt() : chunkRadius, 0, 8);
+      showChunkProgress = json.has("showChunkProgress") ? json.get("showChunkProgress").getAsBoolean() : showChunkProgress;
+      simulatedWidth = clamp(json.has("simulatedWidth") ? json.get("simulatedWidth").getAsInt() : simulatedWidth, 0, 16384);
+      simulatedHeight = clamp(json.has("simulatedHeight") ? json.get("simulatedHeight").getAsInt() : simulatedHeight, 0, 16384);
          useWall = !json.has("useWall") || json.get("useWall").getAsBoolean();
          autoQueue = !json.has("autoQueue") || json.get("autoQueue").getAsBoolean();
          showHud = !json.has("showHud") || json.get("showHud").getAsBoolean();
@@ -197,6 +205,9 @@ public final class QueueConfig {
          JsonObject json = new JsonObject();
          json.addProperty("queueSize", queueSize);
          json.addProperty("chunkRadius", chunkRadius);
+      json.addProperty("showChunkProgress", showChunkProgress);
+      json.addProperty("simulatedWidth", simulatedWidth);
+      json.addProperty("simulatedHeight", simulatedHeight);
          json.addProperty("useWall", useWall);
          json.addProperty("autoQueue", autoQueue);
          json.addProperty("showHud", showHud);

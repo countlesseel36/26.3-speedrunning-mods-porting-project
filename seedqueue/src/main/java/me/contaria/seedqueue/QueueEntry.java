@@ -114,6 +114,24 @@ public final class QueueEntry {
       this.folder = "SeedQueue-" + System.currentTimeMillis() + "-" + number;
    }
 
+   /** Difficulty configured in Atum, so queued worlds match what the reset key would create. */
+   private static net.minecraft.world.Difficulty atumDifficulty() {
+      int id = 1;
+
+      try {
+         Class<?> atum = Class.forName("me.voidxwalker.autoreset.Atum");
+         id = atum.getField("difficulty").getInt(null);
+      } catch (Throwable ignored) {
+      }
+
+      return switch (id) {
+         case 0 -> net.minecraft.world.Difficulty.PEACEFUL;
+         case 2 -> net.minecraft.world.Difficulty.NORMAL;
+         case 3 -> net.minecraft.world.Difficulty.HARD;
+         default -> net.minecraft.world.Difficulty.EASY;
+      };
+   }
+
    public void prepare(Minecraft minecraft) {
       state = State.PREPARING;
 
@@ -123,8 +141,21 @@ public final class QueueEntry {
          packs = ServerPacksSource.createPackRepository(access);
          LevelSettings settings = new LevelSettings(
             folder, GameType.SURVIVAL, LevelSettings.DifficultySettings.DEFAULT, false, WorldDataConfiguration.DEFAULT
-         );
-         WorldOptions options = new WorldOptions(seed, true, false);
+         ).withDifficulty(atumDifficulty());
+         // Use the settings the player configured in Atum instead of vanilla defaults, so queued worlds
+         // match what the reset key would create (structures / bonus chest).
+         boolean generateStructures = true;
+         boolean bonusChest = false;
+
+         try {
+            Class<?> atum = Class.forName("me.voidxwalker.autoreset.Atum");
+            generateStructures = atum.getField("structures").getBoolean(null);
+            bonusChest = atum.getField("bonusChest").getBoolean(null);
+         } catch (Throwable t) {
+            SeedQueue.LOGGER.warn("[seedqueue] could not read Atum world settings, using defaults", t);
+         }
+
+         WorldOptions options = new WorldOptions(seed, generateStructures, bonusChest);
          WorldLoader.PackConfig packConfig = new WorldLoader.PackConfig(packs, settings.dataConfiguration(), false, false);
          WorldLoader.InitConfig initConfig = new WorldLoader.InitConfig(
             packConfig, Commands.CommandSelection.INTEGRATED, PermissionSet.ALL_PERMISSIONS

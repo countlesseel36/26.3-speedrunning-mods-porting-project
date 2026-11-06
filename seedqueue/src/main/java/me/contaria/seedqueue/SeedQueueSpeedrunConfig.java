@@ -61,6 +61,10 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
    @Config.Numbers.Whole.Bounds(min = 2, max = 6)
    public int chunkRadius = 4;
 
+   @Config.Category("debug")
+   @Config.Text("speedrunapi.config.seedqueue.option.showChunkProgress.description")
+   public boolean showChunkProgress = false;
+
    @Config.Category("wall")
    public boolean waitForPreviewSetup = false;
 
@@ -136,8 +140,9 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
    @Config.Category("misc")
    public boolean checkMinMemory = true;
 
+   @Config.Hide
    @Config.Category("advanced")
-   public boolean showAdvancedSettings = false;
+   public boolean showAdvancedSettings = true;
 
    @Config.Category("threading")
    @Config.Numbers.Whole.Bounds(min = 1, max = 5)
@@ -178,6 +183,7 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
    public boolean useWatchdog = false;
 
    @Config.Category("debug")
+   @Config.Hide
    public boolean showChunkMaps = false;
 
    @Config.Ignored
@@ -223,7 +229,8 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
 
    @Override
    public boolean shouldShowOption(String option) {
-      if (this.showAdvancedSettings || "showAdvancedSettings".equals(option)) {
+      // The "show advanced settings" toggle was removed: every option is always listed.
+      if (true) {
          return true;
       }
 
@@ -247,7 +254,7 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
 
    @Override
    public boolean shouldShowCategory(String category) {
-      return this.showAdvancedSettings || !("threading".equals(category) || "debug".equals(category));
+      return true;
    }
 
    @Override
@@ -285,6 +292,9 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
       this.startConcurrently = QueueConfig.startConcurrently;
       this.prewarmWorlds = QueueConfig.prewarmWorlds;
       this.chunkRadius = QueueConfig.chunkRadius;
+      this.showChunkProgress = QueueConfig.showChunkProgress;
+      this.simulatedWidth = QueueConfig.simulatedWidth;
+      this.simulatedHeight = QueueConfig.simulatedHeight;
       this.wallChunkDistance = QueueConfig.wallChunkDistance;
       this.wallDataLimit = QueueConfig.wallDataLimit;
       this.idlePreviewFPS = QueueConfig.idlePreviewFPS;
@@ -328,6 +338,9 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
       QueueConfig.startConcurrently = Math.max(1, Math.min(30, this.startConcurrently));
       QueueConfig.prewarmWorlds = Math.max(0, Math.min(30, this.prewarmWorlds));
       QueueConfig.chunkRadius = Math.max(2, Math.min(6, this.chunkRadius));
+      QueueConfig.showChunkProgress = this.showChunkProgress;
+      QueueConfig.simulatedWidth = Math.max(0, Math.min(16384, this.simulatedWidth));
+      QueueConfig.simulatedHeight = Math.max(0, Math.min(16384, this.simulatedHeight));
       QueueConfig.wallChunkDistance = Math.max(2, Math.min(16, this.wallChunkDistance));
       QueueConfig.wallDataLimit = Math.max(1, Math.min(100, this.wallDataLimit));
       System.setProperty("seedqueue.wallDataLimit", String.valueOf(QueueConfig.wallDataLimit));

@@ -150,5 +150,12 @@
   "speedrunapi.config.seedqueue.option.joinTransition": "进入世界转场",
   "speedrunapi.config.seedqueue.option.joinTransition.description": "进入世界（或重置后直接进下一个世界）时，上一画面向左滑出、新世界预览向右滑入。关掉则使用普通加载界面。",
   "speedrunapi.config.seedqueue.option.prewarmWorlds": "预加载世界数",
-  "speedrunapi.config.seedqueue.option.prewarmWorlds.description": "停留在标题界面时后台先启动多少个世界，这样打开墙时预览已经准备好，不用再等服务器启动。0 表示关闭预加载。"
+  "speedrunapi.config.seedqueue.option.prewarmWorlds.description": "停留在标题界面时后台先启动多少个世界，这样打开墙时预览已经准备好，不用再等服务器启动。0 表示关闭预加载。",
+  "speedrunapi.config.seedqueue.option.showChunkProgress": "显示区块加载进度",
+  "speedrunapi.config.seedqueue.option.showChunkProgress.description": "在卡片上显示已生成/总数 的区块计数。默认隐藏。",
+  "speedrunapi.config.seedqueue.category.troubleshooting": "故障排查",
+  "speedrunapi.config.seedqueue.option.showPauseMenu": "显示暂停菜单",
+  "speedrunapi.config.seedqueue.option.smartSwitch": "智能切换",
+  "speedrunapi.config.seedqueue.option.soundVolume": "音量",
+  "speedrunapi.config.seedqueue.option.checkMinMemory": "检查最低内存"
 }

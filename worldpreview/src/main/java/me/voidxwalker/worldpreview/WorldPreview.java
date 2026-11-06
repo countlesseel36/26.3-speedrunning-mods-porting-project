@@ -707,8 +707,12 @@ public final class WorldPreview {
             depthField.setAccessible(true);
             com.mojang.renderpearl.api.GpuFormat color = (com.mojang.renderpearl.api.GpuFormat)colorField.get(main);
             com.mojang.renderpearl.api.GpuFormat depth = (com.mojang.renderpearl.api.GpuFormat)depthField.get(main);
-            int width = minecraft.getWindow().getWidth();
-            int height = minecraft.getWindow().getHeight();
+            // "Simulated window size": render previews at a fixed resolution instead of the real window,
+            // which keeps several queued worlds cheap. 0 means "use the real window".
+            int simulatedWidth = Integer.getInteger("worldpreview.simulatedWidth", 0);
+            int simulatedHeight = Integer.getInteger("worldpreview.simulatedHeight", 0);
+            int width = simulatedWidth > 0 ? simulatedWidth : minecraft.getWindow().getWidth();
+            int height = simulatedHeight > 0 ? simulatedHeight : minecraft.getWindow().getHeight();
             captureTarget = new com.mojang.blaze3d.pipeline.TextureTarget("seedqueue preview", width, height, color, depth);
             captureTarget.createBuffers(width, height);
          }

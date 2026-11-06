@@ -956,6 +956,9 @@ public final class SeedQueue implements ClientModInitializer {
       // behind the player and the extra frustum area was never generated, which left a black band at
       // the bottom of the cards. The player's own perspective no longer affects the wall.
       System.setProperty("worldpreview.thirdPerson", "false");
+      // Simulated window size for previews (0 = use the real window).
+      System.setProperty("worldpreview.simulatedWidth", String.valueOf(QueueConfig.simulatedWidth));
+      System.setProperty("worldpreview.simulatedHeight", String.valueOf(QueueConfig.simulatedHeight));
 
          if (entry.externalPreview == null) {
                entry.externalPreview = me.voidxwalker.worldpreview.ExternalPreview.build(minecraft, entry.server, previewRadius(entry));
@@ -2114,6 +2117,9 @@ public final class SeedQueue implements ClientModInitializer {
       // behind the player and the extra frustum area was never generated, which left a black band at
       // the bottom of the cards. The player's own perspective no longer affects the wall.
       System.setProperty("worldpreview.thirdPerson", "false");
+      // Simulated window size for previews (0 = use the real window).
+      System.setProperty("worldpreview.simulatedWidth", String.valueOf(QueueConfig.simulatedWidth));
+      System.setProperty("worldpreview.simulatedHeight", String.valueOf(QueueConfig.simulatedHeight));
             entry.renderProperties = new me.voidxwalker.worldpreview.WorldPreviewProperties(
                entry.externalPreview.level,
                entry.externalPreview.listener,
@@ -3371,6 +3377,19 @@ public final class SeedQueue implements ClientModInitializer {
          LOGGER.warn("[seedqueue] could not schedule discard for entry #{}, discarding inline", entry.number, t);
          entry.discard();
       }
+   }
+
+   /** Entries that are still generating (not READY yet). */
+   public static int generatingCount() {
+      int generating = 0;
+
+      for (QueueEntry entry : ENTRIES) {
+         if (entry.state != QueueEntry.State.READY) {
+            generating++;
+         }
+      }
+
+      return generating;
    }
 
    public static int entriesCount() {

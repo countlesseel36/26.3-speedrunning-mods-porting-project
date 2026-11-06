@@ -99,7 +99,8 @@ public final class WallLayout {
          int originX = toPixels(this.x, screenWidth);
          int originY = toPixels(this.y, screenHeight);
          int totalWidth = toPixels(this.width, screenWidth);
-         int gap = Math.round(this.padding);
+         // Cards are drawn edge to edge so the previews tile seamlessly; padding no longer inserts gaps.
+         int gap = 0;
          int cellWidth = Math.max(1, (totalWidth - gap * (this.columns - 1)) / Math.max(1, this.columns));
          // height < 0 means "auto": 16:9 preview + a label line, used by the built-in default.
          int cellHeight = this.height < 0.0F

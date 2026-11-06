@@ -27,6 +27,12 @@ public class SpeedrunConfigScreen extends Screen {
    private SpeedrunOption<?> keybindingsOption;
    private int page;
    private final List<SpeedrunOption<?>> shownOptions = new ArrayList<>();
+   /** StandardSettings support for rebinding keys: resolved lazily so SpeedrunAPI has no hard dependency. */
+   private Object keyBindingConfig;
+   private java.util.function.Predicate<com.mojang.blaze3d.platform.InputConstants.Key> keyListener;
+   private boolean keyCaptureResolved;
+   private Object focusedKeyBinding;
+   private static final java.util.Set<String> drawnLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
    public SpeedrunConfigScreen(String modID, Screen parent) {
       super(TextUtil.translatable("speedrunapi.gui.config.settings"));
@@ -45,7 +51,9 @@ public class SpeedrunConfigScreen extends Screen {
          List<Map.Entry<String, SpeedrunOption<?>>> entries = new ArrayList<>(container.getOptions().entrySet());
          entries.sort(
             Comparator.<Map.Entry<String, SpeedrunOption<?>>>comparingInt(entry -> categoryIndex(entry.getValue().getCategory()))
-               .thenComparing(Map.Entry::getKey)
+               // "Toggle overlay" is the entry point of the debug block: an empty sort key puts it first
+               // within its category.
+               .thenComparing(entry -> entry.getValue().getID().endsWith("debug.overlay") ? "" : entry.getKey())
          );
 
          for (Map.Entry<String, SpeedrunOption<?>> entry : entries) {
@@ -72,13 +80,65 @@ public class SpeedrunConfigScreen extends Screen {
       }
    }
 
+   /**
+    * Canonical bucket for an option's category.
+    *
+    * <p>Options coming from vanilla carry the vanilla group key (e.g. {@code options.sounds},
+    * {@code key.category.movement}), so every one of them used to land after the known categories and
+    * the list interleaved (a music row between two chat rows). Everything is folded into a handful of
+    * buckets so equal kinds stay together.</p>
+    */
+   private static String categoryBucket(String category) {
+      String value = category == null ? "" : category.toLowerCase(java.util.Locale.ROOT);
+
+      if (value.contains("key.category") || value.contains("controls") || value.contains("key")) {
+         return "zz.controls";
+      }
+
+      if (value.contains("sound") || value.contains("music")) {
+         return "zz.sound";
+      }
+
+      if (value.contains("video") || value.contains("graphic") || value.contains("render")) {
+         return "zz.video";
+      }
+
+      if (value.contains("chat")) {
+         return "zz.chat";
+      }
+
+      if (value.contains("mouse") || value.contains("touch")) {
+         return "zz.mouse";
+      }
+
+      if (value.contains("skin") || value.contains("model")) {
+         return "zz.skin";
+      }
+
+      if (value.contains("debug") || value.contains("f3")) {
+         return "zz.debug";
+      }
+
+      if (value.contains("accessib") || value.contains("narrat")) {
+         return "zz.accessibility";
+      }
+
+      return "zz." + value;
+   }
+
    private static int categoryIndex(String category) {
       if (category == null) {
          return CATEGORY_ORDER.size();
       }
 
       int index = CATEGORY_ORDER.indexOf(category);
-      return index < 0 ? CATEGORY_ORDER.size() : index;
+
+      if (index >= 0) {
+         return index;
+      }
+
+      // Unknown (vanilla) categories are grouped into stable buckets after the known ones.
+      return CATEGORY_ORDER.size() + Math.abs(categoryBucket(category).hashCode() % 1000);
    }
 
    private int pageSize() {
@@ -87,6 +147,62 @@ public class SpeedrunConfigScreen extends Screen {
 
    private int pages() {
       return Math.max(1, (this.options.size() + this.pageSize() - 1) / this.pageSize());
+   }
+
+   /** Starts capturing the next key press for a StandardSettings key binding row. */
+   private boolean beginKeyCapture(Object setting) {
+      try {
+         if (!this.keyCaptureResolved) {
+            this.keyCaptureResolved = true;
+            Class<?> main = Class.forName("me.contaria.standardsettings.StandardSettings");
+            this.keyBindingConfig = main.getField("config").get(null);
+            this.keyListener = (java.util.function.Predicate<com.mojang.blaze3d.platform.InputConstants.Key>)this
+               .keyBindingConfig.getClass().getMethod("createInputListener").invoke(this.keyBindingConfig);
+         }
+
+         if (this.keyBindingConfig == null || this.keyListener == null) {
+            return false;
+         }
+
+         this.keyBindingConfig.getClass()
+            .getMethod("setFocusedKeyBinding", setting.getClass())
+            .invoke(this.keyBindingConfig, setting);
+         this.focusedKeyBinding = setting;
+         return true;
+      } catch (Throwable t) {
+         return false;
+      }
+   }
+
+   @Override
+   public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+      if (this.focusedKeyBinding != null && this.keyListener != null) {
+         com.mojang.blaze3d.platform.InputConstants.Key key =
+            com.mojang.blaze3d.platform.InputConstants.getKey(event);
+
+         if (this.keyListener.test(key)) {
+            this.focusedKeyBinding = null;
+            return true;
+         }
+      }
+
+      return super.keyPressed(event);
+   }
+
+   @Override
+   public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+      // Clicking a key binding row starts a capture; the next key press writes it back.
+      int row = (int)((event.y() - 52) / ROW_HEIGHT);
+
+      if (row >= 0 && row < this.shownOptions.size()) {
+         SpeedrunOption<?> option = this.shownOptions.get(row);
+
+         if (option.getClass().getSimpleName().contains("KeyBindingStandardSetting") && this.beginKeyCapture(option)) {
+            return true;
+         }
+      }
+
+      return super.mouseClicked(event, doubleClick);
    }
 
    @Override
@@ -102,11 +218,30 @@ public class SpeedrunConfigScreen extends Screen {
       for (int i = 0; i < size && start + i < this.options.size(); i++) {
          SpeedrunOption<?> option = this.options.get(start + i);
          AbstractWidget widget = option.createWidget();
+
+         // Hover help: options describe themselves through "<id>.description" lang keys.
+         Component description = option.getDescription();
+
+         if (description != null) {
+            widget.setTooltip(net.minecraft.client.gui.components.Tooltip.create(description));
+         }
+
          widget.setX(x);
          widget.setY(52 + i * ROW_HEIGHT);
          widget.setWidth(WIDGET_WIDTH);
          this.addRenderableWidget(widget);
          this.shownOptions.add(option);
+
+         if (Boolean.getBoolean("speedrunapi.logMissingNames")) {
+            // Diagnostics: print every option that is actually rendered with its resolved label, so a
+            // language file can be completed from the log instead of guessing key names.
+            me.contaria.speedrunapi.SpeedrunAPI.LOGGER.info(
+               "[speedrunapi] option {}:{} = '{}'",
+               this.modID,
+               option.getID(),
+               option.getName() == null ? "?" : option.getName().getString()
+            );
+         }
       }
 
       int bottom = this.height - 27;
@@ -241,6 +376,12 @@ public class SpeedrunConfigScreen extends Screen {
          }
 
          int y = 52 + i * ROW_HEIGHT + 6;
+         if (Boolean.getBoolean("speedrunapi.logMissingNames") && drawnLogged.add(this.modID + ":" + option.getID())) {
+            me.contaria.speedrunapi.SpeedrunAPI.LOGGER.info(
+               "[speedrunapi] drawn {}:{} = '{}'", this.modID, option.getID(), name
+            );
+         }
+
          graphics.text(this.font, name, labelRight - this.font.width(name), y, -1);
       }
    }
