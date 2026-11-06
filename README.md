@@ -101,13 +101,13 @@ and does not trigger Atum.*
 
 | chunkRadius | RPS |
 | --- | --- |
-| 2 | **2.07** |
-| 4 | **1.57** |
+| 2 | **2.50** |
+| 4 | **1.90** |
 
 *Press `B` on the wall; the run is timed by actual throughput and the panel reports `N resets in X.XXs
 (Y.YY RPS)`. `benchmarkResets` accepts **1–2000**. Measured on the developer's PC (12th Gen Intel(R)
-Core(TM) i9-12900HX, NVIDIA GeForce RTX 4060 Laptop GPU): **2.07 RPS at `chunkRadius = 2`** and
-**1.57 RPS at `chunkRadius = 4`**.*
+Core(TM) i9-12900HX, NVIDIA GeForce RTX 4060 Laptop GPU): **2.50 RPS at `chunkRadius = 2`** and
+**1.90 RPS at `chunkRadius = 4`**.*
 
 ## 构建 / Building
 
@@ -269,5 +269,5 @@ may still contain major bugs.
   no Gradle, no network). `-Mod all` builds WorldPreview before SeedQueue because SeedQueue compiles against it.
 - **Test**: `powershell -ExecutionPolicy Bypass -File .\tools\run-smoke.ps1 -Seconds 90 -ModsSource .\dist`.
 - **Benchmark**: press `B` on the wall (`benchmarkResets` 1–2000). On the developer's PC (i9-12900HX +
-  RTX 4060 Laptop): **2.07 RPS at `chunkRadius = 2`**, **1.57 RPS at `chunkRadius = 4`**.
+  RTX 4060 Laptop): **2.50 RPS at `chunkRadius = 2`**, **1.90 RPS at `chunkRadius = 4`**.
 - **License**: MIT — see [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md) for upstream credits.
