@@ -24,7 +24,7 @@ import net.minecraft.network.chat.Component;
 @Config(init = Config.InitPoint.ONINITIALIZE)
 public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
    @Config.Category("queue")
-   @Config.Numbers.Whole.Bounds(min = 0, max = 30)
+   @Config.Numbers.Whole.Bounds(min = 0, max = 10)
    public int maxCapacity = 3;
 
    @Config.Category("queue")
@@ -81,15 +81,14 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
    @Config.Numbers.Whole.Bounds(min = 0, max = 100)
    public int soundVolume = 100;
 
+   // No @Config.Hide: the wall preview resolution has to be adjustable from the config screen.
    @Config.Category("wall")
    @Config.Numbers.Whole.Bounds(min = 0, max = 16384)
-   @Config.Hide
-   public int simulatedWidth = 1280;
+   public int simulatedWidth = 0;
 
    @Config.Category("wall")
    @Config.Numbers.Whole.Bounds(min = 0, max = 16384)
-   @Config.Hide
-   public int simulatedHeight = 720;
+   public int simulatedHeight = 0;
 
    @Config.Category("performance")
    @Config.Numbers.Whole.Bounds(min = 1, max = 255)
@@ -129,8 +128,9 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
    @Config.Category("performance")
    public boolean reduceLevelList = true;
 
+   // Cap at 1000: SeedQueue tops out around 2.5 RPS, so a longer benchmark just wastes time.
    @Config.Category("misc")
-   @Config.Numbers.Whole.Bounds(min = 1, max = 2000)
+   @Config.Numbers.Whole.Bounds(min = 1, max = 1000)
    public int benchmarkResets = 1000;
 
    @Config.Category("misc")
@@ -319,7 +319,7 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
    }
 
    private void applyToQueueConfig() {
-      QueueConfig.queueSize = Math.max(1, Math.min(6, this.maxCapacity));
+      QueueConfig.queueSize = Math.max(1, Math.min(10, this.maxCapacity));
       QueueConfig.maxConcurrently = Math.max(0, Math.min(30, this.maxConcurrently));
       QueueConfig.maxConcurrentlyOnWall = Math.max(1, Math.min(30, this.maxConcurrently_onWall));
       QueueConfig.maxWorldGenerationPercentage = Math.max(0, Math.min(100, this.maxWorldGenerationPercentage));
@@ -360,7 +360,7 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
       QueueConfig.previewFps = Math.max(1, this.previewFPS);
       QueueConfig.freezeLockedPreviews = this.freezeLockedPreviews;
       QueueConfig.reduceLevelList = this.reduceLevelList;
-      QueueConfig.benchmarkResets = Math.max(1, Math.min(2000, this.benchmarkResets));
+      QueueConfig.benchmarkResets = Math.max(1, Math.min(1000, this.benchmarkResets));
       QueueConfig.serverThreadPriority = Math.max(1, Math.min(10, this.serverThreadPriority));
       QueueConfig.backgroundExecutorThreadPriority = Math.max(1, Math.min(10, this.backgroundExecutorThreadPriority));
       QueueConfig.save();

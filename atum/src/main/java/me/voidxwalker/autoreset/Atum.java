@@ -107,6 +107,17 @@ public class Atum implements ModInitializer {
          category
       );
 
+      // options.txt still holds the UNKNOWN we wrote while SeedQueue was installed, so removing
+      // SeedQueue used to leave the reset key permanently unbound ("the key does nothing"). Restore
+      // the upstream default when the mapping comes back unbound.
+      if (RESET_KEY_ENABLED
+         && Boolean.parseBoolean(System.getProperty("atum.restoreDefaultResetKey", "true"))
+         && resetKey.saveString().contains("unknown")) {
+         resetKey.setKey(InputConstants.Type.KEYBOARD.getOrCreate(InputConstants.KEY_F6));
+         KeyMapping.resetMapping();
+         LOGGER.info("[atum] reset key was unbound, restored the F6 default");
+      }
+
       configFile = FabricLoader.getInstance().getConfigDir().resolve("atum").resolve("atum.properties");
       load();
    }

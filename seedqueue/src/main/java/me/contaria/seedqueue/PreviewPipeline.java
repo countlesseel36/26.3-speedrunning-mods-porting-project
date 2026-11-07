@@ -45,29 +45,13 @@ public final class PreviewPipeline {
             PreviewCapture.shot = true;
             SeedQueue.LOGGER.info("[seedqueue] capturing spawn view for instance #{}", PreviewCapture.entry.number);
             PreviewCapture.startMillis = System.currentTimeMillis();
-            net.minecraft.client.Screenshot.grab(minecraft, false);
+            requestDirectCapture(minecraft);
          }
 
          if (PreviewCapture.requested && PreviewCapture.entry.nativePreview == null
             && !(minecraft.gui.screen() instanceof BlankScreen)) {
             minecraft.setScreenAndShow(new BlankScreen());
             SeedQueue.LOGGER.info("[seedqueue] re-asserted blank screen for capture");
-         }
-
-         if (PreviewCapture.entry.nativePreview == null && PreviewCapture.startMillis > 0) {
-            java.nio.file.Path shot = findNewScreenshot();
-
-            if (shot != null) {
-               try {
-                  PreviewCapture.entry.nativePreview = com.mojang.blaze3d.platform.NativeImage.read(java.nio.file.Files.newInputStream(shot));
-                  java.nio.file.Files.deleteIfExists(shot);
-                  SeedQueue.LOGGER.info("[seedqueue] loaded captured spawn view from {}", shot.getFileName());
-               } catch (Throwable t) {
-                  SeedQueue.LOGGER.warn("[seedqueue] failed to load captured screenshot", t);
-               }
-
-               PreviewCapture.startMillis = 0;
-            }
          }
 
          if (PreviewCapture.entry.nativePreview != null) {
@@ -105,7 +89,19 @@ public final class PreviewPipeline {
       }
    }
 
+   private static long previewFrameCounter;
+
    public static void frameSwapTick(Minecraft minecraft) {
+      // Rendering a preview every frame costs a full world render for a card that is only ~20x12
+      // pixels on screen. Skipping every other frame halves that cost and is invisible in motion.
+      int every = Math.max(1, Integer.getInteger("seedqueue.previewEveryNthFrame", 2));
+
+      if (every > 1 && (previewFrameCounter++ % every) != 0) {
+         return;
+      }
+
+      previewFramesRendered++;
+
       if (SeedQueue.joinInProgress || PreviewState.handoffPreviewEntry != null) {
          // A join hand-off owns the client level right now (the preview world usually *is* the
          // joined world). Swapping another preview in here would replace the world the player just
@@ -307,13 +303,34 @@ public final class PreviewPipeline {
    }
 
    /** Creates the per-card render target lazily, at the configured (simulated) preview size. */
+   /**
+    * Downscale factor for the card texture.
+    *
+    * <p>Disabled (always 1): the downscaled readback path produced dark/empty cards in testing. 26.3's
+    * {@code Screenshot.takeScreenshot(target, downscale, callback)} hands over a GPU-buffer backed image
+    * that {@code uploadCardImage} cannot interpret, so the wall drew the clear colour. The window-sized
+    * {@code copyColorFrom} path stays the only working option until a sprite-level blit is available.</p>
+    */
+   public static int cardDownscale() {
+      return 1;
+   }
+
    public static void ensureDisplayTarget(Minecraft minecraft, QueueEntry entry) {
       if (entry.displayTarget != null) {
          return;
       }
 
+      if (cardDownscale() > 1) {
+         // Scheme 1: no window-sized target at all. The frame is read back once per preview frame and
+         // downscaled by the screenshot helper, so each card only owns a small GUI texture.
+         return;
+      }
+
       int width = Integer.getInteger("worldpreview.simulatedWidth", 0);
       int height = Integer.getInteger("worldpreview.simulatedHeight", 0);
+
+      // copyColorFrom does not scale, so this target must stay at window size: a smaller target only
+      // cropped the frame (cards looked zoomed).
       entry.displayTarget = me.voidxwalker.worldpreview.WorldPreview.createTarget(
          minecraft,
          "seedqueue card " + entry.number,
@@ -329,12 +346,25 @@ public final class PreviewPipeline {
     * so the wall never shows a half-built chunk. Moved here together with the rest of the preview
     * lifecycle; it only reads the bound entry from {@link PreviewState}.</p>
     */
+   /** Incremented every time a preview frame is rendered; the copy below only runs on new frames. */
+   public static long previewFramesRendered;
+
+   private static long lastCopiedFrame = -1L;
+
    public static void captureWallFrame(Minecraft minecraft) {
       QueueEntry entry = PreviewState.frameSwapEntry;
 
       if (entry == null || entry.displayTarget == null) {
          return;
       }
+
+      // The preview renders every Nth frame (seedqueue.previewEveryNthFrame); copying the full
+      // render target on the frames in between is pure bandwidth for an identical image.
+      if (lastCopiedFrame == previewFramesRendered && previewFramesRendered > 0) {
+         return;
+      }
+
+      lastCopiedFrame = previewFramesRendered;
 
       long now = System.currentTimeMillis();
 
@@ -345,6 +375,26 @@ public final class PreviewPipeline {
       }
 
       try {
+         int downscale = cardDownscale();
+
+         if (downscale > 1) {
+            // Read the finished frame back and let Screenshot downscale it while copying.
+            net.minecraft.client.Screenshot.takeScreenshot(
+               minecraft.gameRenderer.mainRenderTarget(),
+               downscale,
+               image -> {
+                  try {
+                     entry.uploadCardImage(image);
+                  } catch (Throwable t) {
+                     SeedQueue.LOGGER.warn("[seedqueue] failed to upload downscaled card for #{}", entry.number, t);
+                  }
+               }
+            );
+            entry.lastRenderedAt = now;
+            SeedQueue.renderedFrames++;
+            return;
+         }
+
          entry.displayTarget.copyColorFrom(minecraft.gameRenderer.mainRenderTarget());
 
          if (SeedQueue.CARD_READBACK) {
@@ -399,6 +449,47 @@ public final class PreviewPipeline {
    }
 
    /** Newest screenshot written after the capture started, or {@code null}. */
+   /**
+    * Grabs the frame straight from the render target into a {@link com.mojang.blaze3d.platform.NativeImage}
+    * instead of writing a PNG to {@code screenshots/} and reading it back.
+    *
+    * <p>26.3 exposes {@code Screenshot.takeScreenshot(RenderTarget, Consumer<NativeImage>)}, which maps the
+    * colour texture into a mapped buffer on the GPU and hands the pixels to the callback. The callback is
+    * marshalled back to the client thread before the texture is uploaded.</p>
+    */
+   public static void requestDirectCapture(Minecraft minecraft) {
+      if (!Boolean.parseBoolean(System.getProperty("seedqueue.directCapture", "true"))) {
+         SeedQueue.LOGGER.info("[seedqueue] direct capture disabled, skipping the spawn view capture");
+         PreviewCapture.startMillis = 0;
+         return;
+      }
+
+      QueueEntry entry = PreviewCapture.entry;
+
+      if (entry == null) {
+         return;
+      }
+
+      try {
+         net.minecraft.client.Screenshot.takeScreenshot(
+            minecraft.gameRenderer.mainRenderTarget(),
+            image -> minecraft.execute(() -> {
+               if (PreviewCapture.entry != entry || entry.nativePreview != null) {
+                  image.close();
+                  return;
+               }
+
+               entry.nativePreview = image;
+               PreviewCapture.startMillis = 0;
+            })
+         );
+         SeedQueue.LOGGER.info("[seedqueue] direct framebuffer capture requested for instance #{}", entry.number);
+      } catch (Throwable t) {
+         SeedQueue.LOGGER.warn("[seedqueue] direct capture failed, skipping the spawn view capture", t);
+         PreviewCapture.startMillis = 0;
+      }
+   }
+
    public static java.nio.file.Path findNewScreenshot() {
       try {
          java.nio.file.Path dir = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("screenshots");

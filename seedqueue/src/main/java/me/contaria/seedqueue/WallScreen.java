@@ -17,6 +17,9 @@ public final class WallScreen extends Screen {
    private static final boolean WALL_FULLSCREEN_TARGET = Boolean.getBoolean("seedqueue.wallFullscreenTarget");
 
    private final Supplier<List<QueueEntry>> entries;
+   private java.util.List<WallLayout.Slot> cachedMainSlots;
+   private int cachedWidth = -1;
+   private int cachedHeight = -1;
    private final List<int[]> cardBounds = new java.util.ArrayList<>();
    private final List<QueueEntry> cardEntries = new java.util.ArrayList<>();
    private final List<int[]> cardRects = new java.util.ArrayList<>();
@@ -267,11 +270,15 @@ public final class WallScreen extends Screen {
          return false;
       }
 
-      for (int i = 0; i < this.cardBounds.size() && i < this.cardEntries.size(); i++) {
-         int[] bounds = this.cardBounds.get(i);
+      // Snapshot: the lists are rebuilt during rendering, so a click must not walk a live list.
+      java.util.List<int[]> boundsList = new java.util.ArrayList<>(this.cardBounds);
+      java.util.List<QueueEntry> entryList = new java.util.ArrayList<>(this.cardEntries);
+
+      for (int i = 0; i < boundsList.size() && i < entryList.size(); i++) {
+         int[] bounds = boundsList.get(i);
 
          if (event.x() >= bounds[0] && event.x() <= bounds[2] && event.y() >= bounds[1] && event.y() <= bounds[3]) {
-            QueueEntry entry = this.cardEntries.get(i);
+            QueueEntry entry = entryList.get(i);
 
             if (button == BUTTON_RIGHT) {
                this.toggleLock(entry);
@@ -398,7 +405,9 @@ public final class WallScreen extends Screen {
          }
       }
 
-      List<QueueEntry> list = this.entries.get();
+      // Snapshot: the live list can be mutated while the wall renders (refill/discard/join), and a
+      // ConcurrentModificationException on the render thread would crash the client.
+      List<QueueEntry> list = new java.util.ArrayList<>(this.entries.get());
       this.mainScratch.clear();
       this.preparingScratch.clear();
       this.lockedScratch.clear();
@@ -413,7 +422,14 @@ public final class WallScreen extends Screen {
          }
       }
 
-      List<WallLayout.Slot> mainSlots = this.layout.main.resolve(width, height);
+      // Rebuilding the slot list every frame is pure overhead: it only changes with the screen size.
+      if (this.cachedMainSlots == null || this.cachedWidth != width || this.cachedHeight != height) {
+         this.cachedMainSlots = this.layout.main.resolve(width, height);
+         this.cachedWidth = width;
+         this.cachedHeight = height;
+      }
+
+      List<WallLayout.Slot> mainSlots = this.cachedMainSlots;
 
       for (int i = 0; i < mainSlots.size(); i++) {
          WallLayout.Slot slot = mainSlots.get(i);
@@ -564,7 +580,10 @@ public final class WallScreen extends Screen {
             label = label + " " + entry.chunksGenerated + "/" + entry.chunksTotal;
          }
 
-         graphics.text(this.font, label, imageX + 2, y + imageHeight + 2, 0xFFCFCFCF);
+         // Inside the card: drawing below it put the text on the background band between cards.
+         int labelY = y + imageHeight - this.font.lineHeight - 2;
+         graphics.fill(imageX, labelY - 1, imageX + this.font.width(label) + 4, labelY + this.font.lineHeight, 0x80000000);
+         graphics.text(this.font, label, imageX + 2, labelY, 0xFFFFFFFF);
       }
 
       if (entry != null && entry.locked) {

@@ -85,3 +85,5 @@ Copy-Item "dist\past-build\SeedQueue\0.9.0-gamma.27+26.3-SeedQueue.jar" $mods -F
 | 2026-11-07 | SeedQueue | `0.9.0-gamma.37` | 传送服务端玩家（修正 ClientLevel→ServerLevel 强转），对齐生效 | `dist/past-build/SeedQueue/` |
 | 2026-11-07 | SeedQueue | `0.9.0-gamma.38`–`gamma.39` | 退出挂起诊断：打印非守护线程与 18 帧栈 | `dist/past-build/SeedQueue/` |
 | 2026-11-07 | SeedQueue | `0.9.0-gamma.40+26.3` | watchdog 12s→4s（`-Dseedqueue.exitWatchdogMs`）；当前构建 | `dist/` |
+| 2026-11-08 | SeedQueue | `0.9.0-gamma.55+26.3` | 队列/跑分上限、警告文案、分类标题本地化；v0.2.1 发布构建 | `dist/` |
+| 2026-11-08 | SpeedrunAPI | `2.1.0-gamma.4+26.3` | 全局开关置顶、分类标题翻译；v0.2.1 发布构建 | `dist/` |

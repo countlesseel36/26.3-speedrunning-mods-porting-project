@@ -21,8 +21,8 @@ public final class QueueConfig {
    /** Shows "generated/total" chunk progress on the cards; hidden by default. */
    public static boolean showChunkProgress = false;
    /** Preview render resolution; 0 = use the real window size. */
-   public static int simulatedWidth = 1280;
-   public static int simulatedHeight = 720;
+   public static int simulatedWidth = 0;
+   public static int simulatedHeight = 0;
    public static boolean useWall = true;
    public static boolean autoQueue = true;
    public static boolean showHud = true;
@@ -109,10 +109,10 @@ public final class QueueConfig {
       showChunkProgress = json.has("showChunkProgress") ? json.get("showChunkProgress").getAsBoolean() : showChunkProgress;
       // "0" used to mean "follow the window"; it now falls back to the default preview resolution so
       // existing configs pick up the smaller 1280x720 preview targets.
-      int storedWidth = clamp(json.has("simulatedWidth") ? json.get("simulatedWidth").getAsInt() : 1280, 0, 16384);
-      int storedHeight = clamp(json.has("simulatedHeight") ? json.get("simulatedHeight").getAsInt() : 720, 0, 16384);
-      simulatedWidth = storedWidth > 0 ? storedWidth : 1280;
-      simulatedHeight = storedHeight > 0 ? storedHeight : 720;
+      int storedWidth = clamp(json.has("simulatedWidth") ? json.get("simulatedWidth").getAsInt() : 0, 0, 16384);
+      int storedHeight = clamp(json.has("simulatedHeight") ? json.get("simulatedHeight").getAsInt() : 0, 0, 16384);
+      simulatedWidth = storedWidth;
+      simulatedHeight = storedHeight;
          useWall = !json.has("useWall") || json.get("useWall").getAsBoolean();
          autoQueue = !json.has("autoQueue") || json.get("autoQueue").getAsBoolean();
          showHud = !json.has("showHud") || json.get("showHud").getAsBoolean();
@@ -128,7 +128,7 @@ public final class QueueConfig {
          bypassWall = json.has("bypassWall") && json.get("bypassWall").getAsBoolean();
          smartSwitch = json.has("smartSwitch") && json.get("smartSwitch").getAsBoolean();
          waitForPreviewSetup = json.has("waitForPreviewSetup") && json.get("waitForPreviewSetup").getAsBoolean();
-         benchmarkResets = clamp(json.has("benchmarkResets") ? json.get("benchmarkResets").getAsInt() : benchmarkResets, 1, 2000);
+         benchmarkResets = clamp(json.has("benchmarkResets") ? json.get("benchmarkResets").getAsInt() : benchmarkResets, 1, 1000);
          reduceLevelList = !json.has("reduceLevelList") || json.get("reduceLevelList").getAsBoolean();
          freezeLockedPreviews = json.has("freezeLockedPreviews") && json.get("freezeLockedPreviews").getAsBoolean();
          backgroundExecutorThreadPriority = clamp(
@@ -257,7 +257,16 @@ public final class QueueConfig {
          json.add("keyBindings", WallKeybindings.save());
          Path path = path();
          Files.createDirectories(path.getParent());
-         Files.writeString(path, GSON.toJson(json));
+         // Asynchronous: saving happens on key rebinds and option toggles, and the file IO used to run
+      // on the client thread.
+      String payload = GSON.toJson(json);
+      java.util.concurrent.CompletableFuture.runAsync(() -> {
+         try {
+            Files.writeString(path, payload);
+         } catch (Throwable t) {
+            me.contaria.seedqueue.SeedQueue.LOGGER.warn("[seedqueue] failed to save the config", t);
+         }
+      });
       } catch (Throwable t) {
          SeedQueue.LOGGER.warn("[seedqueue] failed to save config", t);
       }

@@ -17,7 +17,7 @@
 | WorldPreview | `6.3.0-gamma.1+26.3` | 预览渲染管线 / Preview rendering pipeline |
 | SpeedrunAPI | `2.1.0-gamma.1+26.3` | 配置界面框架 / Config screen framework |
 | StandardSettings | `2.3.0-gamma.1+26.3` | 进世界应用预设选项 / Applies preset options on world join |
-| Atum | `1.4.0-gamma.1+26.3` | 自动重置；有 SeedQueue 时只提供建世界设置 / Auto reset; settings only when SeedQueue is present |
+| Atum | `1.4.0-gamma.2+26.3` | 自动重置；有 SeedQueue 时只提供建世界设置 / Auto reset; settings only when SeedQueue is present |
 | FastReset | `1.6.0-gamma.1+26.3` | 秒退到标题 / Instant quit to title |
 
 可选 / Optional: `SeedQueue-LockedPool.zip`（锁定池资源包 / locked-pool resource pack）
@@ -63,6 +63,21 @@
 3. 建议同时安装 Sodium 0.9.3 / Sodium 0.9.3 is recommended
 4. 首次启动生成 `config/seedqueue.json` 与 `config/mcsr/` 配置
    / The first launch creates `config/seedqueue.json` and the files under `config/mcsr/`
+
+## 性能调优 / Performance tuning
+
+- 6 个队列世界常驻时堆压力较大，建议 4G 堆 + G1，并开启并行引用处理
+  / Six queued servers keep a lot of heap alive: use a 4G heap with G1 and parallel reference processing
+
+```
+-Xms4G -Xmx4G -XX:+UseG1GC -XX:MaxGCPauseMillis=30 -XX:+ParallelRefProcEnabled
+```
+
+- 预览默认隔帧渲染，可用 `-Dseedqueue.previewEveryNthFrame=3` 再降一档
+  / Previews render every other frame by default; `-Dseedqueue.previewEveryNthFrame=3` lowers it further
+- 补卡检查默认每 10 tick 一次（`-Dseedqueue.refillIntervalTicks`），预览 chunk worker 默认上限 2（`-Dseedqueue.previewWorkers`）
+  / Refill checks run every 10 ticks (`-Dseedqueue.refillIntervalTicks`) and preview chunk workers are capped at 2
+  (`-Dseedqueue.previewWorkers`)
 
 ## 构建 / Build
 

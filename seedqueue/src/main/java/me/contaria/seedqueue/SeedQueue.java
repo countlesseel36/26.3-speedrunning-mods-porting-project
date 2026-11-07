@@ -27,6 +27,8 @@ public final class SeedQueue implements ClientModInitializer {
       return java.util.Collections.unmodifiableList(ENTRIES);
    }
    private static final Random RANDOM = new Random();
+   /** Ticks until the next refill check; keeps the queue from re-scanning every single tick. */
+   private static int refillCooldown;
    private static int nextEntryNumber;
    private static boolean testStarted;
    private static boolean testDiscarded;
@@ -1039,7 +1041,10 @@ public final class SeedQueue implements ClientModInitializer {
                   benchmarkStarted = System.currentTimeMillis();
                }
                benchmarkCount++;
-               refillQueue(minecraft);
+               if (--refillCooldown <= 0) {
+         refillCooldown = Math.max(1, Integer.getInteger("seedqueue.refillIntervalTicks", 10));
+         refillQueue(minecraft);
+      }
 
                if (benchmarkCount >= Integer.getInteger("seedqueue.benchmarkResets", QueueConfig.benchmarkResets)) {
                   benchmarking = false;
@@ -2024,10 +2029,10 @@ public final class SeedQueue implements ClientModInitializer {
          return;
       }
 
-      System.gc();
-
+      // No System.gc() here: a forced full GC per queued instance was a visible stutter whenever
+      // -Dseedqueue.memLog=true was enabled. The numbers are a little stale, which is fine for a log.
       try {
-         Thread.sleep(150L);
+         Thread.sleep(20L);
       } catch (InterruptedException ignored) {
          Thread.currentThread().interrupt();
       }

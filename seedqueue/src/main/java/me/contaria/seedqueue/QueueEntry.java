@@ -88,6 +88,8 @@ public final class QueueEntry {
    private net.minecraft.resources.Identifier previousPreviewTexture;
    public volatile int captureHeight;
    private int previewUploads;
+   /** Reused GUI texture: re-registering a DynamicTexture per card frame churned VRAM. */
+   private net.minecraft.client.renderer.texture.DynamicTexture previewDynamicTexture;
    public volatile boolean previewActive;
    public volatile boolean shotCaptured;
    public volatile boolean frozen;
@@ -742,11 +744,24 @@ public final class QueueEntry {
 
          captureWidth = image.getWidth();
          captureHeight = image.getHeight();
+
+         if (this.previewDynamicTexture != null
+            && this.previewDynamicTexture.getPixels() != null
+            && this.previewDynamicTexture.getPixels().getWidth() == captureWidth
+            && this.previewDynamicTexture.getPixels().getHeight() == captureHeight) {
+            // Same size: copy the pixels into the existing texture instead of allocating a new one.
+            this.previewDynamicTexture.setPixels(image);
+            this.previewDynamicTexture.upload();
+            image.close();
+            return;
+         }
+
          var texture = new net.minecraft.client.renderer.texture.DynamicTexture(() -> "seedqueue card " + number, image);
          net.minecraft.resources.Identifier id = net.minecraft.resources.Identifier.fromNamespaceAndPath(
             "seedqueue", "card_" + number + "_" + previewUploads++
          );
          net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+         this.previewDynamicTexture = texture;
 
          if (previousPreviewTexture != null) {
             try {

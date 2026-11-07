@@ -53,11 +53,12 @@ public class SpeedrunConfigScreen extends Screen {
          me.contaria.speedrunapi.config.api.SpeedrunConfig config = container.getConfig();
          List<Map.Entry<String, SpeedrunOption<?>>> entries = new ArrayList<>(container.getOptions().entrySet());
          entries.sort(
-            Comparator.<Map.Entry<String, SpeedrunOption<?>>>comparingInt(entry -> groupIndex(entry.getValue()))
+            Comparator.<Map.Entry<String, SpeedrunOption<?>>>comparingInt(entry -> optionPriority(entry.getValue()))
+               .thenComparingInt(entry -> groupIndex(entry.getValue()))
+               .thenComparing(entry -> categoryBucket(entry.getValue().getCategory()))
                // Options that belong to the same vanilla screen (video / accessibility / chat ...) must
                // stay together: sorting by the bucket name before the id keeps the groups contiguous
                // instead of scattering them by hash order.
-               .thenComparing(entry -> categoryBucket(entry.getValue().getCategory()))
                .thenComparing(entry -> entry.getValue().getID().endsWith("debug.overlay") ? "" : entry.getKey())
          );
 
@@ -133,24 +134,24 @@ public class SpeedrunConfigScreen extends Screen {
 
    /** Readable headings for the grouped vanilla buckets. */
    private static final java.util.Map<String, String> BUCKET_TITLES = java.util.Map.ofEntries(
-      java.util.Map.entry("zz.controls", "按键控制"),
-      java.util.Map.entry("zz.sound", "声音设置"),
-      java.util.Map.entry("zz.video", "视频设置"),
-      java.util.Map.entry("zz.chat", "聊天设置"),
-      java.util.Map.entry("zz.mouse", "鼠标设置"),
-      java.util.Map.entry("zz.skin", "皮肤设置"),
-      java.util.Map.entry("zz.accessibility", "辅助功能设置"),
-      java.util.Map.entry("zz.debug", "调试选项"),
-      java.util.Map.entry("queue", "队列选项"),
-      java.util.Map.entry("wall", "墙界面选项"),
-      java.util.Map.entry("performance", "性能选项"),
-      java.util.Map.entry("advanced", "进阶选项"),
-      java.util.Map.entry("threading", "线程选项"),
-      java.util.Map.entry("misc", "杂项"),
-      java.util.Map.entry("debug", "调试选项"),
-      java.util.Map.entry("f3", "F3 设置"),
-      java.util.Map.entry("more", "更多设置"),
-      java.util.Map.entry("onWorldJoin", "进入世界时设置")
+      java.util.Map.entry("zz.controls", "speedrunapi.group.zz_controls"),
+      java.util.Map.entry("zz.sound", "speedrunapi.group.zz_sound"),
+      java.util.Map.entry("zz.video", "speedrunapi.group.zz_video"),
+      java.util.Map.entry("zz.chat", "speedrunapi.group.zz_chat"),
+      java.util.Map.entry("zz.mouse", "speedrunapi.group.zz_mouse"),
+      java.util.Map.entry("zz.skin", "speedrunapi.group.zz_skin"),
+      java.util.Map.entry("zz.accessibility", "speedrunapi.group.zz_accessibility"),
+      java.util.Map.entry("zz.debug", "speedrunapi.group.zz_debug"),
+      java.util.Map.entry("queue", "speedrunapi.group.queue"),
+      java.util.Map.entry("wall", "speedrunapi.group.wall"),
+      java.util.Map.entry("performance", "speedrunapi.group.performance"),
+      java.util.Map.entry("advanced", "speedrunapi.group.advanced"),
+      java.util.Map.entry("threading", "speedrunapi.group.threading"),
+      java.util.Map.entry("misc", "speedrunapi.group.misc"),
+      java.util.Map.entry("debug", "speedrunapi.group.debug"),
+      java.util.Map.entry("f3", "speedrunapi.group.f3"),
+      java.util.Map.entry("more", "speedrunapi.group.more"),
+      java.util.Map.entry("onWorldJoin", "speedrunapi.group.onWorldJoin")
    );
 
    /**
@@ -161,6 +162,11 @@ public class SpeedrunConfigScreen extends Screen {
     * when the category changed. The group is therefore derived from the option id when the category is
     * missing.</p>
     */
+   /** Category ids that have no translation use these keys, so the heading follows the game language. */
+   private static String groupLabel(String chinese, String key) {
+      return net.minecraft.locale.Language.getInstance().getOrDefault(key);
+   }
+
    private static String groupTitle(SpeedrunOption<?> option) {
       String category = option.getCategory();
 
@@ -171,27 +177,27 @@ public class SpeedrunConfigScreen extends Screen {
       String id = option.getID().toLowerCase(java.util.Locale.ROOT);
 
       if (id.startsWith("key_") || id.startsWith("key.")) {
-         return "按键控制";
+         return groupLabel("按键控制", "speedrunapi.group.controls");
       }
 
       if (id.contains("sound") || id.contains("music") || id.contains("volume")) {
-         return "声音设置";
+         return groupLabel("声音设置", "speedrunapi.group.sound");
       }
 
       if (id.contains("chat") || id.contains("narrat") || id.contains("notification")) {
-         return "聊天设置";
+         return groupLabel("聊天设置", "speedrunapi.group.chat");
       }
 
       if (id.contains("mouse") || id.contains("invert") || id.contains("sensitivity")) {
-         return "鼠标设置";
+         return groupLabel("鼠标设置", "speedrunapi.group.mouse");
       }
 
       if (id.contains("modelpart") || id.contains("cape") || id.contains("skin")) {
-         return "皮肤设置";
+         return groupLabel("皮肤设置", "speedrunapi.group.skin");
       }
 
       if (id.contains("debug") || id.contains("hitbox") || id.contains("chunk")) {
-         return "调试选项";
+         return groupLabel("调试选项", "speedrunapi.group.debug");
       }
 
       if (id.contains("fov") || id.contains("render") || id.contains("graphic") || id.contains("gui")
@@ -199,10 +205,10 @@ public class SpeedrunConfigScreen extends Screen {
          || id.contains("mipmap") || id.contains("vsync") || id.contains("fullscreen")
          || id.contains("anisotropy") || id.contains("fps") || id.contains("simulation")
          || id.contains("ao") || id.contains("biomeblend")) {
-         return "视频设置";
+         return groupLabel("视频设置", "speedrunapi.group.video");
       }
 
-      return "杂项";
+      return groupLabel("杂项", "speedrunapi.group.misc");
    }
 
    private static final java.util.List<String> GROUP_ORDER = java.util.List.of(
@@ -210,6 +216,20 @@ public class SpeedrunConfigScreen extends Screen {
       "按键控制", "视频设置", "聊天设置", "声音设置", "鼠标设置", "皮肤设置",
       "辅助功能设置", "F3 设置", "进入世界时设置", "更多设置", "杂项", "调试选项"
    );
+
+   /**
+    * Options that control the whole config (StandardSettings' "toggle all" and "use StandardSettings")
+    * belong at the top of the page, not at the bottom of the misc group.
+    */
+   private static int optionPriority(SpeedrunOption<?> option) {
+      String id = option.getID();
+
+      if (id.equals("toggleAll") || id.equals("useStandardSettings")) {
+         return -1;
+      }
+
+      return 0;
+   }
 
    private static int groupIndex(SpeedrunOption<?> option) {
       int index = GROUP_ORDER.indexOf(groupTitle(option));
@@ -222,17 +242,17 @@ public class SpeedrunConfigScreen extends Screen {
       }
 
       String bucket = categoryBucket(category);
-      String title = BUCKET_TITLES.get(bucket);
+      String key = BUCKET_TITLES.get(bucket);
 
-      if (title != null) {
-         return title;
+      if (key != null) {
+         return net.minecraft.locale.Language.getInstance().getOrDefault(key);
       }
 
       // Fall back to the known-category table, then to a readable form of the raw name.
-      title = BUCKET_TITLES.get(category);
+      key = BUCKET_TITLES.get(category);
 
-      if (title != null) {
-         return title;
+      if (key != null) {
+         return net.minecraft.locale.Language.getInstance().getOrDefault(key);
       }
 
       return pretty(bucket.startsWith("zz.") ? bucket.substring(3) : bucket);
@@ -563,6 +583,17 @@ public class SpeedrunConfigScreen extends Screen {
 
       // Clip the option labels to the list area so nothing bleeds into the title or the button band.
       graphics.enableScissor(0, 36, this.width, this.height - 40);
+
+      try {
+         this.drawOptionLabels(graphics);
+      } finally {
+         // Scissor state must never leak into the widgets drawn afterwards.
+         graphics.disableScissor();
+      }
+   }
+
+   /** Draws the clipped option labels; called inside an enableScissor/disableScissor pair. */
+   private void drawOptionLabels(GuiGraphicsExtractor graphics) {
       int labelRight = this.width / 2 - 10;
 
       int firstVisible = Math.max(0, this.scroll / ROW_HEIGHT);
@@ -669,8 +700,6 @@ public class SpeedrunConfigScreen extends Screen {
 
          graphics.text(this.font, name, labelRight - this.font.width(name), y, -1);
       }
-
-      graphics.disableScissor();
    }
 
    /** Turns an option/category id into a readable label when no translation is available. */

@@ -6,16 +6,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import me.contaria.standardsettings.options.StandardSetting;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
-import net.minecraft.client.TextureFilteringMethod;
 import net.minecraft.client.resources.language.LanguageManager;
-import net.minecraft.server.packs.resources.SimpleReloadInstance;
-import net.minecraft.util.Unit;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -27,13 +23,9 @@ public class StandardSettings {
    public static String lastWorld;
    public static boolean onWorldJoinPending;
    public static boolean autoF3EscPending;
-   private static int oldMipmaps;
-   private static int oldAnisotropyBit;
-   private static TextureFilteringMethod oldTextureFiltering;
 
    public static void reset() {
       config.update();
-      cacheMipMap();
 
       for (StandardSetting<?> setting : config.standardSettings) {
          setting.resetOption();
@@ -114,25 +106,8 @@ public class StandardSettings {
          languageManager.onResourceManagerReload(client.getResourceManager());
       }
 
+      // Every join used to walk the option list; skip the whole pass unless a join is pending.
       boolean applied = guiScaleChanged;
-
-      if (compareMipMap()) {
-         client.updateMaxMipLevel((Integer)client.options.mipmapLevels().get());
-         SimpleReloadInstance.create(
-               client.getResourceManager(),
-               List.of(client.getAtlasManager(), client.getModelManager()),
-               Runnable::run,
-               Runnable::run,
-               CompletableFuture.completedFuture(Unit.INSTANCE),
-               false
-            )
-            .done()
-            .join();
-         // Re-baseline: without this the comparison above stays true forever and every world join
-         // re-ran a full synchronous resource reload (a very visible stutter when entering a world).
-         cacheMipMap();
-         applied = true;
-      }
 
       if (applied) {
          KeyMapping.resetMapping();
@@ -192,17 +167,4 @@ public class StandardSettings {
       return config.toggleStandardSettings;
    }
 
-   private static void cacheMipMap() {
-      Options options = Minecraft.getInstance().options;
-      oldMipmaps = (Integer)options.mipmapLevels().get();
-      oldAnisotropyBit = (Integer)options.maxAnisotropyBit().get();
-      oldTextureFiltering = (TextureFilteringMethod)options.textureFiltering().get();
-   }
-
-   private static boolean compareMipMap() {
-      Options options = Minecraft.getInstance().options;
-      return (Integer)options.mipmapLevels().get() != oldMipmaps
-         || (Integer)options.maxAnisotropyBit().get() != oldAnisotropyBit
-         || options.textureFiltering().get() != oldTextureFiltering;
-   }
 }
