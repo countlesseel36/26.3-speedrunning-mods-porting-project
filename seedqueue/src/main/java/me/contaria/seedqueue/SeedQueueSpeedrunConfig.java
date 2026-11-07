@@ -84,12 +84,12 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
    @Config.Category("wall")
    @Config.Numbers.Whole.Bounds(min = 0, max = 16384)
    @Config.Hide
-   public int simulatedWidth = 0;
+   public int simulatedWidth = 1280;
 
    @Config.Category("wall")
    @Config.Numbers.Whole.Bounds(min = 0, max = 16384)
    @Config.Hide
-   public int simulatedHeight = 0;
+   public int simulatedHeight = 720;
 
    @Config.Category("performance")
    @Config.Numbers.Whole.Bounds(min = 1, max = 255)

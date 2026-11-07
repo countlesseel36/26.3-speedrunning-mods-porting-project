@@ -258,16 +258,33 @@ public final class SodiumCompat {
    private static java.lang.reflect.Method onChunkStatusAdded;
    private static java.lang.reflect.Method scheduleRebuildForChunk;
 
-   /** Sodium's "terrain render complete" flag for the bound level, or null when unavailable. */
+   private static Class<?> terrainCompleteClass;
+   private static java.lang.reflect.Method terrainCompleteMethod;
+
+   /**
+    * Sodium's "terrain render complete" flag for the bound level, or null when unavailable.
+    *
+    * <p>Called every frame while a card is being captured, so the reflective method lookup is cached
+    * per renderer class instead of being resolved through {@code getMethod} on each call.</p>
+    */
    public static Boolean terrainComplete() {
       if (!PRESENT || renderer == null) {
          return null;
       }
 
       try {
-         Object complete = renderer.getClass().getMethod("isTerrainRenderComplete").invoke(renderer);
+         Class<?> type = renderer.getClass();
+
+         if (terrainCompleteClass != type || terrainCompleteMethod == null) {
+            terrainCompleteClass = type;
+            terrainCompleteMethod = type.getMethod("isTerrainRenderComplete");
+         }
+
+         Object complete = terrainCompleteMethod.invoke(renderer);
          return complete instanceof Boolean value ? value : null;
       } catch (Throwable t) {
+         terrainCompleteClass = null;
+         terrainCompleteMethod = null;
          return null;
       }
    }

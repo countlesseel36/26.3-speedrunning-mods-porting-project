@@ -85,7 +85,15 @@ public abstract class SodiumWorldRendererMixin {
 
          this.level = target;
          this.renderSectionManager = manager;
-         this.renderDistance = Minecraft.getInstance().options.getEffectiveRenderDistance();
+         // Render only what a preview actually has: the generated radius plus a small margin. Using the
+         // vanilla render distance made Sodium render a large band of empty chunks (the black "fog"
+         // beyond the loaded area) for every preview.
+         int effectiveRenderDistance = Minecraft.getInstance().options.getEffectiveRenderDistance();
+         int previewLimit = me.contaria.seedqueue.PreviewState.renderDistance;
+         boolean previewLevel = target != Minecraft.getInstance().level;
+         this.renderDistance = previewLimit > 0 && previewLevel
+            ? Math.min(effectiveRenderDistance, previewLimit)
+            : effectiveRenderDistance;
 
          // Sodium deletes the uniform buffer manager when it unloads a real level. Reusing a cached
          // preview manager would otherwise render with a null uniform buffer and crash in setupTerrain.

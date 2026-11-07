@@ -28,12 +28,27 @@ public final class WallKeybindings {
       RESET_COLUMN,
       RESET_ROW,
       PLAY_NEXT_LOCK,
+      BACK_TO_WALL,
       START_BENCHMARK,
       CANCEL_BENCHMARK,
       QUIT
    }
 
    public static final int UNKNOWN = -1;
+   /** Mouse bindings are encoded as -1000 - button so they never collide with keyboard codes. */
+   public static final int MOUSE_BASE = -1000;
+
+   public static int mouseKey(int button) {
+      return MOUSE_BASE - button;
+   }
+
+   public static boolean isMouse(int key) {
+      return key <= MOUSE_BASE;
+   }
+
+   public static int mouseButton(int key) {
+      return MOUSE_BASE - key;
+   }
 
    public static final class Binding {
       public int primary;
@@ -59,8 +74,10 @@ public final class WallKeybindings {
       DEFAULTS.put(Action.RESET_COLUMN, new Binding(InputConstants.KEY_K));
       DEFAULTS.put(Action.RESET_ROW, new Binding(InputConstants.KEY_J));
       DEFAULTS.put(Action.PLAY_NEXT_LOCK, new Binding(InputConstants.KEY_M));
+      DEFAULTS.put(Action.BACK_TO_WALL, new Binding(InputConstants.KEY_F6));
       DEFAULTS.put(Action.START_BENCHMARK, new Binding(InputConstants.KEY_B));
       DEFAULTS.put(Action.CANCEL_BENCHMARK, new Binding(InputConstants.KEY_N));
+      // Escape closes the wall through the vanilla screen handling; the binding stays unbound.
       DEFAULTS.put(Action.QUIT, new Binding(InputConstants.KEY_ESCAPE));
       resetDefaults();
       // "Play Next Lock" is a single key (M). Combination keys were removed because the SDL input
@@ -136,22 +153,39 @@ public final class WallKeybindings {
       return Character.isLetter(a) && Character.isLetter(b) && Character.toLowerCase(a) == Character.toLowerCase(b);
    }
 
+   /**
+    * Normalises a key event to the codes the bindings store.
+    *
+    * <p>{@code KeyEvent#key()} is an SDL scancode on 26.3, while {@code InputConstants.KEY_*} are GLFW
+    * values, so a default such as F6 (295) never matched the raw event code. Bindings and comparisons
+    * now both go through this conversion.</p>
+    */
+   public static int keyOf(KeyEvent event) {
+      try {
+         return InputConstants.getKey(event).getValue();
+      } catch (Throwable t) {
+         return event.key();
+      }
+   }
+
    /** Returns the action this key event triggers, checking secondary and blocking keys. */
-   public static Action match(KeyEvent event) {
-      for (Map.Entry<Action, Binding> entry : BINDINGS.entrySet()) {
+   /** Returns the action bound to a normalised key code, or null. */
+   public static Action matchCode(int code) {
+      for (java.util.Map.Entry<Action, Binding> entry : BINDINGS.entrySet()) {
          Binding binding = entry.getValue();
 
-         if (binding.primary == UNKNOWN || !sameKey(binding.primary, event.key())) {
+         if (binding.primary == UNKNOWN || !sameKey(binding.primary, code)) {
             continue;
          }
 
-         // Chord (secondary) and blocking keys were removed: the SDL input path could not report
-         // modifier state reliably, so a binding either fired only with its modifier held or never.
-         // A binding is now just its primary key.
          return entry.getKey();
       }
 
       return null;
+   }
+
+   public static Action match(KeyEvent event) {
+      return matchCode(keyOf(event));
    }
 
    public static String translationKey(Action action) {
@@ -166,6 +200,7 @@ public final class WallKeybindings {
          case RESET_COLUMN -> "seedqueue.key.resetColumn";
          case RESET_ROW -> "seedqueue.key.resetRow";
          case PLAY_NEXT_LOCK -> "seedqueue.key.playNextLock";
+         case BACK_TO_WALL -> "seedqueue.key.backToWall";
          case START_BENCHMARK -> "seedqueue.key.startBenchmark";
          case CANCEL_BENCHMARK -> "seedqueue.key.cancelBenchmark";
          case QUIT -> "seedqueue.key.quitWall";
@@ -174,7 +209,8 @@ public final class WallKeybindings {
 
    public static String display(int key) {
       if (key == UNKNOWN) {
-         return "?";
+         // Same wording as the vanilla unbound state ("未指定" in Chinese).
+         return net.minecraft.locale.Language.getInstance().getOrDefault("key.keyboard.unknown");
       }
 
       return InputConstants.Type.KEYBOARD.getOrCreate(key).getDisplayName().getString();

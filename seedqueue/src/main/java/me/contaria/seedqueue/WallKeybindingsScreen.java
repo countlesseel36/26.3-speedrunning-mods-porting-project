@@ -23,7 +23,8 @@ public final class WallKeybindingsScreen extends Screen {
    private int mode;
    private final Set<Integer> modifiers = new LinkedHashSet<>();
    private int page;
-   private int perPage;
+   /** Pixel offset of the single scrollable key list. */
+   private int scroll;
 
    public WallKeybindingsScreen(Screen parent) {
       super(Component.translatable("seedqueue.menu.keys.configure"));
@@ -39,18 +40,20 @@ public final class WallKeybindingsScreen extends Screen {
    @Override
    protected void init() {
       super.init();
-      this.perPage = Math.max(1, (this.height - 80) / 27);
       WallKeybindings.Action[] actions = WallKeybindings.Action.values();
-      int start = this.page * this.perPage;
-      int end = Math.min(actions.length, start + this.perPage);
+      // Scrolling list again (kept simple now that the missing binding crash is fixed).
+      int start = 0;
+      int end = actions.length;
+      this.scroll = Math.max(0, Math.min(this.scroll, this.maxScroll()));
       int center = this.width / 2;
 
       for (int i = start; i < end; i++) {
          WallKeybindings.Action action = actions[i];
-         int y = 36 + (i - start) * 27;
+         int y = 36 + i * 27 - this.scroll;
          Button chord = Button.builder(Component.literal(this.chord(action)), button -> this.edit(action, 0))
             .bounds(center - 30, y, 80, 20)
             .build();
+         chord.visible = y >= 30 && y + 20 <= this.height - 44;
          chord.setTooltip(Tooltip.create(Component.translatable("seedqueue.menu.keys.primary")));
          this.addRenderableWidget(chord);
 
@@ -59,18 +62,6 @@ public final class WallKeybindingsScreen extends Screen {
          // now edits a single key per action.
       }
 
-      this.addRenderableWidget(
-         Button.builder(Component.literal("<"), button -> {
-            this.page--;
-            this.rebuildWidgets();
-         }).bounds(center - 100, this.height - 30, 40, 20).build()
-      ).active = this.page > 0;
-      this.addRenderableWidget(
-         Button.builder(Component.literal(">"), button -> {
-            this.page++;
-            this.rebuildWidgets();
-         }).bounds(center - 55, this.height - 30, 40, 20).build()
-      ).active = (this.page + 1) * this.perPage < actions.length;
       this.addRenderableWidget(
          Button.builder(Component.translatable("gui.done"), button -> this.onClose())
             .bounds(center, this.height - 30, 100, 20)
@@ -83,6 +74,28 @@ public final class WallKeybindingsScreen extends Screen {
             this.rebuildWidgets();
          }).bounds(center + 105, this.height - 30, 110, 20).build()
       );
+   }
+
+   /** Height of the scrollable content: all actions, one row each. */
+   private int maxScroll() {
+      int visible = this.height - 44 - 36;
+      int content = WallKeybindings.Action.values().length * 27;
+      return Math.max(0, content - visible);
+   }
+
+   @Override
+   public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+      int max = this.maxScroll();
+      int next = Math.max(0, Math.min(max, this.scroll - (int)(vertical * 27)));
+      // Snap to whole rows, but always allow the exact end position so the last key is reachable.
+      next = next >= max ? max : next / 27 * 27;
+
+      if (next != this.scroll) {
+         this.scroll = next;
+         this.rebuildWidgets();
+      }
+
+      return true;
    }
 
    private Tooltip keysTooltip(String kind, List<Integer> keys) {
@@ -128,13 +141,24 @@ public final class WallKeybindingsScreen extends Screen {
       }
 
       if (event.isEscape()) {
-         this.editing = null;
-         this.modifiers.clear();
-         this.rebuildWidgets();
+         if (this.editing == WallKeybindings.Action.QUIT) {
+            // Quit is the one action that may legitimately use Escape.
+            WallKeybindings.setPrimary(this.editing, com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE);
+            WallKeybindings.setSecondary(this.editing, List.of());
+            WallKeybindings.setBlocking(this.editing, List.of());
+            this.finishEdit();
+            return true;
+         }
+
+         // Elsewhere Escape means "no key": clear the binding instead of storing Escape itself.
+         WallKeybindings.setPrimary(this.editing, WallKeybindings.UNKNOWN);
+         WallKeybindings.setSecondary(this.editing, List.of());
+         WallKeybindings.setBlocking(this.editing, List.of());
+         this.finishEdit();
          return true;
       }
 
-      int key = event.key();
+      int key = WallKeybindings.keyOf(event);
 
       if (key == com.mojang.blaze3d.platform.InputConstants.KEY_BACKSPACE) {
          if (this.mode == 0) {
@@ -169,36 +193,7 @@ public final class WallKeybindingsScreen extends Screen {
    @Override
    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
       if (this.editing != null) {
-         // 26.3 hands over SDL button numbers (1 = left, 2 = middle, 3 = right), while
-         // InputConstants and InputConstants.isKeyDown use GLFW's 0-based indices.
-         int mouseIndex = event.button() - 1;
-
-         if (mouseIndex < 0 || mouseIndex > 7) {
-            return true;
-         }
-
-         int key = com.mojang.blaze3d.platform.InputConstants.Type.MOUSE.getOrCreate(mouseIndex).getValue();
-
-         if (this.mode == 0) {
-            WallKeybindings.setPrimary(this.editing, key);
-            WallKeybindings.setSecondary(this.editing, List.of());
-         } else {
-            List<Integer> keys = new ArrayList<>(this.mode == 1
-               ? WallKeybindings.binding(this.editing).secondary
-               : WallKeybindings.binding(this.editing).blocking);
-
-            if (!keys.remove(Integer.valueOf(key))) {
-               keys.add(key);
-            }
-
-            if (this.mode == 1) {
-               WallKeybindings.setSecondary(this.editing, keys);
-            } else {
-               WallKeybindings.setBlocking(this.editing, keys);
-            }
-         }
-
-         this.finishEdit();
+         // Mouse buttons are not bindable on the wall (gamma.28 behaviour).
          return true;
       }
 
@@ -214,10 +209,8 @@ public final class WallKeybindingsScreen extends Screen {
       graphics.centeredText(this.font, title, this.width / 2, 12, 0xFFFFFFFF);
 
       WallKeybindings.Action[] actions = WallKeybindings.Action.values();
-      int start = this.page * this.perPage;
-      int end = Math.min(actions.length, start + this.perPage);
 
-      for (int i = start; i < end; i++) {
+      for (int i = 0; i < actions.length; i++) {
          String key = WallKeybindings.translationKey(actions[i]);
          String name = net.minecraft.locale.Language.getInstance().getOrDefault(key);
 
@@ -225,9 +218,14 @@ public final class WallKeybindingsScreen extends Screen {
             name = actions[i].name().replace('_', ' ');
          }
 
-         graphics.text(this.font, name, Math.max(5, this.width / 2 - 165), 42 + (i - start) * 27, 0xFFFFFFFF);
+         int y = 42 + i * 27 - this.scroll;
+
+         if (y - 6 >= 30 && y - 6 + 20 <= this.height - 44) {
+            graphics.text(this.font, name, Math.max(5, this.width / 2 - 165), y, 0xFFFFFFFF);
+         }
       }
    }
+
 
    @Override
    public void onClose() {

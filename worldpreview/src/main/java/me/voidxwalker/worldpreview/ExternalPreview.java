@@ -134,6 +134,7 @@ public final class ExternalPreview {
          ((me.voidxwalker.worldpreview.mixin.ClientPacketListenerAccessor)listener).worldpreview$setLevel(level);
          MultiPlayerGameMode gameMode = new MultiPlayerGameMode(minecraft, listener);
          LocalPlayer player = gameMode.createPlayer(level, null, null, new ItemActivation());
+         applyRealSkin(minecraft, player);
 
          if (player == null) {
             return null;
@@ -157,6 +158,7 @@ public final class ExternalPreview {
          // and left a black band at the bottom of the cards, whatever the player's perspective was.
          if (false && Boolean.getBoolean("worldpreview.thirdPerson")) {
             LocalPlayer camera = gameMode.createPlayer(level, null, null, new ItemActivation());
+         applyRealSkin(minecraft, camera);
 
             if (camera != null) {
                camera.setPos(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5 - 3.0);
@@ -308,6 +310,59 @@ public final class ExternalPreview {
     * The PlayerInfo profile is handed over as-is (not copied) because SkinManager keys its cache by
     * profile identity/properties; a copy never resolves to a skin.
     */
+   private static java.lang.reflect.Field playerInfoField;
+   private static boolean playerInfoResolved;
+
+   /**
+    * Hands the real player's {@code PlayerInfo} to a preview player.
+    *
+    * <p>{@code AbstractClientPlayer#getSkin()} resolves through its {@code playerInfo} field, and a
+    * preview player created without one falls back to the default skin — which is why third-person
+    * cards had no skin. Copying the profile was not enough; the skin manager needs the same
+    * {@code PlayerInfo} instance the real connection uses.</p>
+    */
+   static void applyRealSkin(Minecraft minecraft, net.minecraft.client.player.LocalPlayer player) {
+      try {
+         var real = minecraft.getGameProfile();
+
+         if (real == null || player == null) {
+            return;
+         }
+
+         var connection = minecraft.getConnection();
+
+         if (connection == null) {
+            return;
+         }
+
+         var info = connection.getPlayerInfo(real.id());
+
+         if (info == null) {
+            return;
+         }
+
+         if (!playerInfoResolved) {
+            playerInfoResolved = true;
+
+            for (Class<?> type = player.getClass(); type != null; type = type.getSuperclass()) {
+               try {
+                  java.lang.reflect.Field field = type.getDeclaredField("playerInfo");
+                  field.setAccessible(true);
+                  playerInfoField = field;
+                  break;
+               } catch (NoSuchFieldException ignored) {
+               }
+            }
+         }
+
+         if (playerInfoField != null) {
+            playerInfoField.set(player, info);
+         }
+      } catch (Throwable t) {
+         WorldPreview.LOGGER.warn("[preview] could not apply the real player skin", t);
+      }
+   }
+
    static GameProfile previewProfile(Minecraft minecraft) {
       try {
          var real = minecraft.getGameProfile();
@@ -611,6 +666,7 @@ public final class ExternalPreview {
          ((me.voidxwalker.worldpreview.mixin.ClientPacketListenerAccessor)listener).worldpreview$setLevel(level);
          MultiPlayerGameMode gameMode = new MultiPlayerGameMode(minecraft, listener);
          LocalPlayer player = gameMode.createPlayer(level, null, null, new ItemActivation());
+         applyRealSkin(minecraft, player);
 
          if (player == null) {
             return null;
@@ -634,6 +690,7 @@ public final class ExternalPreview {
          // and left a black band at the bottom of the cards, whatever the player's perspective was.
          if (false && Boolean.getBoolean("worldpreview.thirdPerson")) {
             LocalPlayer camera = gameMode.createPlayer(level, null, null, new ItemActivation());
+         applyRealSkin(minecraft, camera);
 
             if (camera != null) {
                camera.setPos(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5 - 3.0);

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "fast_reset",
-  "version": "1.6.0-beta.3+26.3",
+  "version": "1.6.0-gamma.1+26.3",
   "name": "FastReset",
   "description": "Skips saving worlds to reset faster. Ported to Minecraft 26.3 by the Chinese 1.16.2+ speedrunning community.",
   "authors": [

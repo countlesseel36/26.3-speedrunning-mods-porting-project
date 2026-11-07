@@ -41,12 +41,14 @@ public abstract class PauseScreenMixin extends Screen {
 
       this.addRenderableWidget(Button.builder(FastReset.quitLabel(), button -> {
          FastReset.saveOnQuit = false;
+         FastReset.skipSavesNow = true;
 
          try {
             // Blocks until the integrated server has fully shut down, so the flag is safe to
             // restore in the finally block.
             this.minecraft.disconnectFromWorld(ClientLevel.DEFAULT_QUIT_MESSAGE);
          } finally {
+            FastReset.skipSavesNow = false;
             FastReset.saveOnQuit = true;
          }
       }).bounds(x, y, width, height).build());

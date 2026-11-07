@@ -42,6 +42,8 @@ public final class PreviewBuilder {
    public static final int CHUNK_RADIUS = 2;
    private static final int CHUNKS_PER_REQUEST = 8;
    private static final ConcurrentLinkedQueue<ClientboundLevelChunkWithLightPacket> PACKETS = new ConcurrentLinkedQueue<>();
+   /** Safety valve: an abandoned preview must not keep growing the queue forever. */
+   private static final int MAX_PACKETS = Math.max(256, Integer.getInteger("worldpreview.maxPackets", 4096));
    private static final Set<Long> REQUESTED = ConcurrentHashMap.newKeySet();
    private static final AtomicBoolean SNAPSHOT_PENDING = new AtomicBoolean();
    private static final java.util.concurrent.atomic.AtomicReference<net.minecraft.world.phys.Vec3> SAFE_SPAWN = new java.util.concurrent.atomic.AtomicReference<>();
@@ -186,6 +188,10 @@ public final class PreviewBuilder {
             }
 
             PACKETS.addAll(packets);
+
+      while (PACKETS.size() > MAX_PACKETS) {
+         PACKETS.poll();
+      }
          } catch (Throwable t) {
             WorldPreview.LOGGER.warn("[preview] failed to snapshot chunks", t);
          } finally {
@@ -245,6 +251,7 @@ public final class PreviewBuilder {
          ((me.voidxwalker.worldpreview.mixin.ClientPacketListenerAccessor)listener).worldpreview$setLevel(level);
          MultiPlayerGameMode gameMode = new MultiPlayerGameMode(minecraft, listener);
          LocalPlayer player = gameMode.createPlayer(level, null, null, new ItemActivation());
+         me.voidxwalker.worldpreview.ExternalPreview.applyRealSkin(minecraft, player);
          if (player == null) {
             return null;
          }

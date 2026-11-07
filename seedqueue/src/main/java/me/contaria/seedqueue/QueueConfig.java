@@ -21,8 +21,8 @@ public final class QueueConfig {
    /** Shows "generated/total" chunk progress on the cards; hidden by default. */
    public static boolean showChunkProgress = false;
    /** Preview render resolution; 0 = use the real window size. */
-   public static int simulatedWidth = 0;
-   public static int simulatedHeight = 0;
+   public static int simulatedWidth = 1280;
+   public static int simulatedHeight = 720;
    public static boolean useWall = true;
    public static boolean autoQueue = true;
    public static boolean showHud = true;
@@ -107,8 +107,12 @@ public final class QueueConfig {
          queueSize = clamp(json.has("queueSize") ? json.get("queueSize").getAsInt() : queueSize, 1, 6);
          chunkRadius = clamp(json.has("chunkRadius") ? json.get("chunkRadius").getAsInt() : chunkRadius, 0, 8);
       showChunkProgress = json.has("showChunkProgress") ? json.get("showChunkProgress").getAsBoolean() : showChunkProgress;
-      simulatedWidth = clamp(json.has("simulatedWidth") ? json.get("simulatedWidth").getAsInt() : simulatedWidth, 0, 16384);
-      simulatedHeight = clamp(json.has("simulatedHeight") ? json.get("simulatedHeight").getAsInt() : simulatedHeight, 0, 16384);
+      // "0" used to mean "follow the window"; it now falls back to the default preview resolution so
+      // existing configs pick up the smaller 1280x720 preview targets.
+      int storedWidth = clamp(json.has("simulatedWidth") ? json.get("simulatedWidth").getAsInt() : 1280, 0, 16384);
+      int storedHeight = clamp(json.has("simulatedHeight") ? json.get("simulatedHeight").getAsInt() : 720, 0, 16384);
+      simulatedWidth = storedWidth > 0 ? storedWidth : 1280;
+      simulatedHeight = storedHeight > 0 ? storedHeight : 720;
          useWall = !json.has("useWall") || json.get("useWall").getAsBoolean();
          autoQueue = !json.has("autoQueue") || json.get("autoQueue").getAsBoolean();
          showHud = !json.has("showHud") || json.get("showHud").getAsBoolean();

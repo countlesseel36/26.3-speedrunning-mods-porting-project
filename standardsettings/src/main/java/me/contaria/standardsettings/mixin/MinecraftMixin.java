@@ -77,6 +77,11 @@ public abstract class MinecraftMixin {
    }
 
    @Inject(method = "tick", at = @At("HEAD"))
+   private void standardsettings$applySettings(CallbackInfo ci) {
+      StandardSettings.tick();
+   }
+
+   @Inject(method = "tick", at = @At("HEAD"))
    private void autoF3Esc(CallbackInfo ci) {
       StandardSettings.autoF3EscPending = StandardSettings.autoF3EscPending & (this.singleplayerServer != null && !this.isWindowActive());
       if (StandardSettings.autoF3EscPending) {

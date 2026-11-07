@@ -20,8 +20,12 @@ public final class SeedQueue implements ClientModInitializer {
    private static final boolean TEST = Boolean.getBoolean("seedqueue.test");
    private static final boolean HANDOFF = Boolean.getBoolean("seedqueue.handoff");
    private static final boolean WALL_PROPERTY = Boolean.getBoolean("seedqueue.wall");
-
    private static final List<QueueEntry> ENTRIES = new ArrayList<>();
+
+   /** Read-only view of the queue for the extracted preview pipeline. */
+   static List<QueueEntry> entries() {
+      return java.util.Collections.unmodifiableList(ENTRIES);
+   }
    private static final Random RANDOM = new Random();
    private static int nextEntryNumber;
    private static boolean testStarted;
@@ -46,20 +50,10 @@ public final class SeedQueue implements ClientModInitializer {
    private static boolean deleteSent;
    private static boolean previewShot;
    private static int previewShotTicks;
-   private static QueueEntry capturingEntry;
-   private static me.voidxwalker.worldpreview.ExternalPreview capturingPreview;
-   private static int captureTicks;
-   private static boolean captureRequested;
-   private static boolean captureFrameActive;
-   private static int captureHold;
    private static net.minecraft.client.gui.screens.Screen blankCaptureSavedWall;
    private static boolean blankCaptureHudHidden;
    private static int restoreTicks = -1;
-   private static boolean captureHudHidden;
-   private static net.minecraft.client.gui.screens.Screen captureSavedScreen;
-   private static boolean captureShot;
    private static boolean frameCaptured;
-   private static boolean swapTestDone;
    private static QueueEntry liveEntry;
    private static final java.util.concurrent.atomic.AtomicInteger RENDER_LOG_COUNTER = new java.util.concurrent.atomic.AtomicInteger();
    private static final java.util.concurrent.atomic.AtomicInteger SUCCESS_LOG_COUNTER = new java.util.concurrent.atomic.AtomicInteger();
@@ -73,9 +67,8 @@ public final class SeedQueue implements ClientModInitializer {
    private static QueueEntry frameCaptureEntry;
    private static int frameCaptureTicks;
    private static boolean frameCaptureActive;
-   private static QueueEntry activePreviewEntry;
-   private static int previewFramesLeft;
-   private static boolean previewCaptured;
+   static int previewFramesLeft;
+   static boolean previewCaptured;
    private static int previewCycleIndex;
    /** True when the wall was opened from a loaded world, so joining from it is expected. */
    private static boolean wallOpenedInWorld;
@@ -87,11 +80,11 @@ public final class SeedQueue implements ClientModInitializer {
     * {@code Minecraft.level} right after the join and leave it there (the world then renders through
     * the preview camera/level - wrong distant terrain, low fps, and a stuck shutdown).</p>
     */
-   private static boolean joinInProgress;
+   static boolean joinInProgress;
    private static boolean copyDumped;
    private static int wallOpenTicks;
-   private static boolean pendingGrab;
-   private static long grabStartedAt;
+   static boolean pendingGrab;
+   static long grabStartedAt;
    private static int grabHoldTicks;
    private static QueueEntry previewGrabEntry;
    private static boolean pendingPreviewCapture;
@@ -100,13 +93,12 @@ public final class SeedQueue implements ClientModInitializer {
    private static long frameCaptureStartMillis;
    private static boolean frameCaptureWaiting;
    private static int frameCaptureCleanupTicks;
-   private static int renderedFrames;
+   static int renderedFrames;
    private static int offscreenTicks;
    private static boolean offscreenDone;
    private static int wallShotTicks;
    private static boolean wallShotDone;
    private static int wallShotPending;
-   private static long captureStartMillis;
    private static boolean offscreenPending;
    private static boolean offscreenSwapped;
    private static boolean lockResetDone;
@@ -128,24 +120,21 @@ public final class SeedQueue implements ClientModInitializer {
    public static volatile long benchmarkFinishedAt;
    public static volatile int benchmarkResultResets;
    public static volatile long benchmarkResultMs;
-   private static QueueEntry handoffPreviewEntry;
    private static int handoffTicks;
 
    // ------------------------------------------------ per-card frame capture
-   private static QueueEntry frameSwapEntry;
-   private static int frameSwapIndex;
-   private static long frameSwapDwellUntil;
-   private static long nextFrameSwapAt;
+   static int frameSwapIndex;
+   static long nextFrameSwapAt;
 
    private static final int PREVIEW_DWELL_MS = Math.max(10, Integer.getInteger("seedqueue.previewDwellMs", 30));
-   private static final int PREVIEW_GAP_MS = Math.max(0, Integer.getInteger("seedqueue.previewGapMs", 0));
-   private static final boolean CARD_READBACK = Boolean.getBoolean("seedqueue.cardReadback");
-   private static final boolean CAMERA_LOG = Boolean.getBoolean("seedqueue.cameraLog");
+   static final int PREVIEW_GAP_MS = Math.max(0, Integer.getInteger("seedqueue.previewGapMs", 0));
+   static final boolean CARD_READBACK = Boolean.getBoolean("seedqueue.cardReadback");
+   static final boolean CAMERA_LOG = Boolean.getBoolean("seedqueue.cameraLog");
    private static final boolean RENDER_LOG = Boolean.getBoolean("seedqueue.renderLog");
    private static final boolean FPS_LOG = Boolean.getBoolean("seedqueue.fpsLog");
    private static long fpsWindowStart;
    private static int fpsFrames;
-   private static final java.util.List<QueueEntry> FRAME_SWAP_READY = new java.util.ArrayList<>();
+   static final java.util.List<QueueEntry> FRAME_SWAP_READY = new java.util.ArrayList<>();
    private static Boolean lastThirdPerson;
 
    private static int previewDwellMs() {
@@ -156,12 +145,7 @@ public final class SeedQueue implements ClientModInitializer {
 
    /** Avoids a synchronized System.setProperty on every preview arm; the value rarely changes. */
    private static void applyThirdPerson() {
-      boolean thirdPerson = "third_person".equals(QueueConfig.perspective);
-
-      if (lastThirdPerson == null || lastThirdPerson != thirdPerson) {
-         lastThirdPerson = thirdPerson;
-         System.setProperty("worldpreview.thirdPerson", String.valueOf(thirdPerson));
-      }
+      PreviewPipeline.applyPerspective();
    }
 
    /**
@@ -199,270 +183,19 @@ public final class SeedQueue implements ClientModInitializer {
     * preview renders a large band of empty chunks (the "world not fully loaded" look). Wall Preview
     * Distance can only lower it.
     */
+   /** Render distance used while a preview level is bound, or -1 when the real level is rendered. */
+
    public static int previewRadius(QueueEntry entry) {
       int generated = Math.max(1, entry == null ? QueueConfig.chunkRadius : entry.chunkRadius);
       return Math.max(1, Math.min(QueueConfig.wallChunkDistance, generated));
    }
 
    private static void frameSwapTick(Minecraft minecraft) {
-      // Respawning replaces the client level; rebuilding previews during that window caused a
-      // multi-second frame drop, so the rotation stays paused for a few seconds afterwards.
-      if (previewPauseTicks > 0) {
-         return;
-      }
-
-      if (joinInProgress || handoffPreviewEntry != null) {
-         // A join hand-off owns the client level right now (the preview world usually *is* the
-         // joined world). Swapping another preview in here would replace the world the player just
-         // entered with a card's preview level.
-         if (frameSwapEntry != null) {
-            me.voidxwalker.worldpreview.WorldPreview.deactivateExternal();
-            frameSwapEntry = null;
-         }
-
-         return;
-      }
-
-      if (!wallPreviewEnabled()) {
-         if (me.voidxwalker.worldpreview.WorldPreview.keepSodiumBound) {
-            me.voidxwalker.worldpreview.WorldPreview.keepSodiumBound = false;
-         }
-
-         return;
-      }
-
-      boolean wall = minecraft.gui.screen() instanceof WallScreen;
-      me.voidxwalker.worldpreview.WorldPreview.keepSodiumBound = wall || frameSwapEntry != null;
-
-      long now = System.currentTimeMillis();
-
-      if (frameSwapEntry != null) {
-         if (!wall) {
-            me.voidxwalker.worldpreview.WorldPreview.deactivateExternal();
-            frameSwapEntry = null;
-            return;
-         }
-
-         if (now < frameSwapDwellUntil) {
-            return;
-         }
-
-         me.voidxwalker.worldpreview.WorldPreview.deactivateExternal();
-         frameSwapEntry.lastPreviewAt = now;
-         frameSwapEntry = null;
-         nextFrameSwapAt = now + PREVIEW_GAP_MS;
-         // Fall through: the next card can be armed in the same frame (Preview FPS throttle below).
-      }
-
-      if (!wall || now < nextFrameSwapAt) {
-         return;
-      }
-
-      java.util.List<QueueEntry> ready = FRAME_SWAP_READY;
-      ready.clear();
-
-      for (QueueEntry entry : ENTRIES) {
-         if (entry.state == QueueEntry.State.READY
-            && entry.server != null
-            && !(QueueConfig.freezeLockedPreviews && entry.locked)) {
-            ready.add(entry);
-         }
-      }
-
-      if (ready.isEmpty()) {
-         // Everything is locked and frozen; keep the wall usable by previewing them anyway.
-         for (QueueEntry entry : ENTRIES) {
-            if (entry.state == QueueEntry.State.READY && entry.server != null) {
-               ready.add(entry);
-            }
-         }
-      }
-
-      if (ready.isEmpty()) {
-         return;
-      }
-
-      // Preview FPS: each card is rendered at most previewFps times per second. The dwell below is
-      // shared between all cards, so the whole rotation runs at previewFps * cardCount frames/second.
-      int previewFps = Math.max(1, QueueConfig.previewFps);
-      long interval = Math.max(1L, 1000L / previewFps);
-      QueueEntry entry = null;
-      QueueEntry hovered = WallScreen.hoveredEntry();
-
-      for (int i = 0; i < ready.size(); i++) {
-         QueueEntry candidate = ready.get((frameSwapIndex + i) % ready.size());
-         // Idle Preview FPS: ready previews the player is not hovering update slower, keeping the wall
-         // smooth when many worlds are ready (0 = use the normal Preview FPS for everything).
-         int fps = QueueConfig.idlePreviewFPS > 0 && candidate != hovered
-            ? QueueConfig.idlePreviewFPS
-            : previewFps;
-         long candidateInterval = Math.max(1L, 1000L / Math.max(1, fps));
-
-         if (candidate.lastPreviewAt == 0 || now - candidate.lastPreviewAt >= candidateInterval) {
-            entry = candidate;
-            frameSwapIndex = (frameSwapIndex + i + 1) % ready.size();
-            break;
-         }
-      }
-
-      if (entry == null) {
-         return;
-      }
-
-      entry.lastPreviewAt = now;
-      applyThirdPerson();
-
-      try {
-         if (entry.externalPreview == null) {
-            // READY entries are parked (server thread frozen), so build from the chunk snapshot that
-            // generation already captured instead of asking the server for chunks.
-            java.util.List<net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket> snapshot;
-
-            synchronized (entry.chunkPackets) {
-               snapshot = new java.util.ArrayList<>(entry.chunkPackets);
-            }
-
-            entry.externalPreview = snapshot.size() >= 9
-               ? me.voidxwalker.worldpreview.ExternalPreview.fromPackets(minecraft, entry.server, snapshot, previewRadius(entry))
-               : me.voidxwalker.worldpreview.ExternalPreview.build(minecraft, entry.server, previewRadius(entry));
-         }
-
-         if (entry.externalPreview == null) {
-            return;
-         }
-
-         SodiumLevelCache.markPreview(entry.externalPreview.level, entry.externalPreview.spawn);
-
-         if (entry.renderProperties == null) {
-            entry.renderProperties = new me.voidxwalker.worldpreview.WorldPreviewProperties(
-               entry.externalPreview.level,
-               entry.externalPreview.listener,
-               entry.externalPreview.gameMode,
-               entry.externalPreview.player,
-               entry.externalPreview.spawn
-            );
-         }
-
-         if (entry.displayTarget == null) {
-            entry.displayTarget = me.voidxwalker.worldpreview.WorldPreview.createTarget(
-               minecraft, "seedqueue card " + entry.number,
-               minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight()
-            );
-         }
-
-         if (entry.displayTarget == null) {
-            return;
-         }
-
-         me.voidxwalker.worldpreview.WorldPreview.hideDebugOverlay = true;
-         me.voidxwalker.worldpreview.WorldPreview.suppressDebugOverlay = true;
-         me.voidxwalker.worldpreview.WorldPreview.activateExternal(entry.renderProperties);
-         // Feed the chunk snapshot now: Sodium is already bound to this level (keepSodiumBound) and
-         // its tracker only accepts chunks for the level it is rendering.
-         entry.externalPreview.activateSections();
-
-         if (!entry.pendingPackets.isEmpty()) {
-            java.util.List<net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket> incoming;
-
-            synchronized (entry.pendingPackets) {
-               incoming = new java.util.ArrayList<>(entry.pendingPackets);
-               entry.pendingPackets.clear();
-            }
-
-            if (!incoming.isEmpty()) {
-               entry.externalPreview.applyNewPackets(incoming);
-            }
-         }
-
-         if (!entry.sectionsPrepared) {
-            // prepareExternal() calls allChanged(), which throws away every compiled section. Only do
-            // that once per preview level instead of on every rotation (it dominated the wall frame).
-            entry.sectionsPrepared = true;
-            me.voidxwalker.worldpreview.WorldPreview.prepareExternal(minecraft);
-         }
-
-         me.voidxwalker.worldpreview.WorldPreview.forceLevelRender = true;
-
-         if (CAMERA_LOG) {
-            LOGGER.info(
-               "[seedqueue] card #{} camera={} spawnY={}",
-               entry.number,
-               entry.renderProperties.player.position(),
-               entry.externalPreview.spawnPosY
-            );
-         }
-
-         frameSwapEntry = entry;
-         long dwell = Math.max(1L, Math.round(1000.0 / (previewFps * (double) Math.max(1, ready.size()))));
-         frameSwapDwellUntil = now + dwell;
-      } catch (Throwable t) {
-         LOGGER.warn("[seedqueue] failed to arm wall frame for #{}", entry.number, t);
-         me.voidxwalker.worldpreview.WorldPreview.deactivateExternal();
-         frameSwapEntry = null;
-      }
+      PreviewPipeline.frameSwapTick(minecraft);
    }
 
-   /** Called at the GUI boundary: the main target holds the world-only frame, copy it to the card. */
    public static void captureWallFrame(Minecraft minecraft) {
-      QueueEntry entry = frameSwapEntry;
-
-      if (entry == null || entry.displayTarget == null) {
-         return;
-      }
-
-      long now = System.currentTimeMillis();
-
-      // While the card's sections are being re-sent / recompiled the frame is incomplete (terrain
-      // pops in white). Keep the previous frame instead of copying it.
-      if (entry.externalPreview != null && !entry.externalPreview.settled()) {
-         return;
-      }
-
-      try {
-         if (entry.displayTarget != null) {
-            // The preview camera is static, so an unchanged chunk count means the frame is identical
-            // to the last copy. Skip the full-window GPU copy until Sodium uploads another chunk.
-            // Copy the world-only frame into a sample-only texture (never an attachment when the GUI
-            // samples it later in the same frame). Always copy: skipping frames leaves the card on a
-            // stale sky-only image while Sodium is still compiling the sections behind it.
-            entry.displayTarget.copyColorFrom(minecraft.gameRenderer.mainRenderTarget());
-         }
-
-         if (CARD_READBACK) {
-            net.minecraft.client.Screenshot.takeScreenshot(minecraft.gameRenderer.mainRenderTarget(), image -> {
-               try {
-                  entry.uploadCardImage(image);
-                  entry.lastPreviewAt = System.currentTimeMillis();
-               } catch (Throwable t) {
-                  LOGGER.warn("[seedqueue] failed to upload card for #{}", entry.number, t);
-               }
-            });
-         }
-
-         entry.lastRenderedAt = now;
-         renderedFrames++;
-
-         if (RENDER_LOG && renderedFrames % 120 == 0) {
-            try {
-               var state = ((me.voidxwalker.worldpreview.mixin.GameRendererAccessor)minecraft.gameRenderer)
-                  .worldpreview$gameRenderState();
-               var cameraState = state.levelRenderState.cameraRenderState;
-               var previewLevel = entry.externalPreview == null ? null : entry.externalPreview.level;
-               LOGGER.info(
-                  "[seedqueue] preview atmosphere #{}: clock={} fog={} fogEnd={} sky={}",
-                  entry.number,
-                  previewLevel == null ? "null" : previewLevel.getOverworldClockTime(),
-                  cameraState.fogData == null ? "null" : cameraState.fogData.color,
-                  cameraState.fogData == null ? -1.0F : cameraState.fogData.renderDistanceEnd,
-                  state.levelRenderState.skyRenderState == null ? "null" : state.levelRenderState.skyRenderState.skyColor
-               );
-            } catch (Throwable t) {
-               LOGGER.warn("[seedqueue] atmosphere log failed", t);
-            }
-         }
-      } catch (Throwable t) {
-         LOGGER.warn("[seedqueue] failed to capture wall frame for #{}", entry.number, t);
-      }
+      PreviewPipeline.captureWallFrame(minecraft);
    }
 
    @Override
@@ -570,8 +303,24 @@ public final class SeedQueue implements ClientModInitializer {
    }
 
    /** Stops all background servers and removes their worlds when the client exits. */
+   /** True once the client is exiting: GPU work must be skipped, the context is going away. */
+   public static volatile boolean shuttingDown;
+
    public static void shutdown() {
+      shuttingDown = true;
       for (QueueEntry entry : new ArrayList<>(ENTRIES)) {
+         // Wake and halt the background server first: its thread is not a daemon, so a parked server
+         // kept the JVM alive after the window closed (the exit watchdog then had to kill the process).
+         try {
+            entry.parked = false;
+
+            if (entry.server != null) {
+               entry.server.halt(false);
+            }
+         } catch (Throwable t) {
+            LOGGER.warn("[seedqueue] failed to halt queued server #{}", entry.number, t);
+         }
+
          entry.discard();
       }
 
@@ -701,11 +450,11 @@ public final class SeedQueue implements ClientModInitializer {
    }
    /** Activates the external preview for one queued instance at a time and captures its frame. */
    private static void previewCycleTick(Minecraft minecraft) {
-      if (shotPhase != 0 || joinInProgress || handoffPreviewEntry != null) {
+      if (shotPhase != 0 || joinInProgress || PreviewState.handoffPreviewEntry != null) {
          return;
       }
 
-      if (activePreviewEntry != null) {
+      if (PreviewState.activePreviewEntry != null) {
          return;
       }
 
@@ -791,7 +540,7 @@ public final class SeedQueue implements ClientModInitializer {
          }
 
          me.voidxwalker.worldpreview.WorldPreview.setTargetOverride(entry.renderTarget);
-         activePreviewEntry = entry;
+         PreviewState.activePreviewEntry = entry;
          previewFramesLeft = 10;
          previewCaptured = false;
          return;
@@ -800,7 +549,7 @@ public final class SeedQueue implements ClientModInitializer {
 
    /** Advances an active preview cycle: request the capture, then deactivate after a few frames. */
    private static void previewCycleFrame(Minecraft minecraft) {
-      if (activePreviewEntry == null) {
+      if (PreviewState.activePreviewEntry == null) {
          return;
       }
 
@@ -813,7 +562,7 @@ public final class SeedQueue implements ClientModInitializer {
 
       if (!previewCaptured && previewFramesLeft <= 4) {
          previewCaptured = true;
-         QueueEntry entry = activePreviewEntry;
+         QueueEntry entry = PreviewState.activePreviewEntry;
          previewGrabEntry = entry;
          grabHoldTicks = 4;
          pendingGrab = true;
@@ -836,40 +585,15 @@ public final class SeedQueue implements ClientModInitializer {
 
    /** Fully restores the game state used for preview rendering. */
    public static QueueEntry activePreviewEntryForDebug() {
-      return activePreviewEntry;
+      return PreviewState.activePreviewEntry;
    }
 
    public static boolean isCaptureFrameActive() {
-      return captureFrameActive;
+      return PreviewCapture.active;
    }
 
    public static void stopPreviewCycle(Minecraft minecraft) {
-      pendingGrab = false;
-      grabStartedAt = 0;
-      me.voidxwalker.worldpreview.WorldPreview.instanceRendering = false;
-      me.voidxwalker.worldpreview.WorldPreview.forceLevelRender = false;
-      me.voidxwalker.worldpreview.WorldPreview.restoreMainTarget(minecraft);
-      me.voidxwalker.worldpreview.WorldPreview.hideDebugOverlay = false;
-      me.voidxwalker.worldpreview.WorldPreview.suppressDebugOverlay = false;
-      captureFrameActive = false;
-
-      if (activePreviewEntry != null) {
-         try {
-            me.voidxwalker.worldpreview.WorldPreview.swapOut(minecraft);
-         } catch (Throwable t) {
-            LOGGER.warn("[seedqueue] failed to swap out preview", t);
-         }
-
-         activePreviewEntry = null;
-      }
-
-      if (me.voidxwalker.worldpreview.WorldPreview.isActive()) {
-         me.voidxwalker.worldpreview.WorldPreview.deactivateExternal();
-      }
-
-      previewCaptured = false;
-      previewFramesLeft = 0;
-      me.voidxwalker.worldpreview.WorldPreview.setTargetOverride(null);
+      PreviewPipeline.stop(minecraft);
    }
    /** Renders up to N ready instances into their own targets, once per frame. */
    public static void renderInstances(Minecraft minecraft) {
@@ -1145,129 +869,6 @@ public final class SeedQueue implements ClientModInitializer {
       }
    }
 
-   /** Builds and captures a real rendered frame for each ready instance, one at a time. */
-   private static void previewTick(Minecraft minecraft) {
-      if (capturingEntry != null) {
-         captureTicks++;
-
-         if (!captureRequested && captureTicks > 30) {
-            captureRequested = true;
-            LOGGER.info("[seedqueue] hiding UI before capturing instance #{}", capturingEntry.number);
-            captureFrameActive = true;
-            captureSavedScreen = minecraft.gui.screen();
-
-            if (captureSavedScreen != null) {
-               minecraft.setScreenAndShow(new BlankScreen());
-            }
-
-            if (!minecraft.gui.hud.isHidden()) {
-               minecraft.gui.hud.toggle();
-               captureHudHidden = true;
-            }
-         }
-
-         if (Boolean.getBoolean("seedqueue.swapTest") && !swapTestDone && captureRequested && captureTicks > 40) {
-            swapTestDone = true;
-            boolean swapped = me.voidxwalker.worldpreview.WorldPreview.swapMainTarget(minecraft);
-            LOGGER.info("[seedqueue] swap test: swapped={}", swapped);
-            net.minecraft.client.Screenshot.grab(minecraft, false);
-         }
-
-         if (captureRequested && !captureShot && captureTicks > 50) {
-            captureShot = true;
-            LOGGER.info("[seedqueue] capturing spawn view for instance #{}", capturingEntry.number);
-            captureStartMillis = System.currentTimeMillis();
-            net.minecraft.client.Screenshot.grab(minecraft, false);
-         }
-
-         if (captureRequested && capturingEntry.nativePreview == null
-            && !(minecraft.gui.screen() instanceof BlankScreen)) {
-            minecraft.setScreenAndShow(new BlankScreen());
-            LOGGER.info("[seedqueue] re-asserted blank screen for capture");
-         }
-
-         if (capturingEntry.nativePreview == null && captureStartMillis > 0) {
-            java.nio.file.Path shot = findNewScreenshot();
-
-            if (shot != null) {
-               try {
-                  capturingEntry.nativePreview = com.mojang.blaze3d.platform.NativeImage.read(java.nio.file.Files.newInputStream(shot));
-                  java.nio.file.Files.deleteIfExists(shot);
-                  LOGGER.info("[seedqueue] loaded captured spawn view from {}", shot.getFileName());
-               } catch (Throwable t) {
-                  LOGGER.warn("[seedqueue] failed to load captured screenshot", t);
-               }
-
-               captureStartMillis = 0;
-            }
-         }
-
-         if (capturingEntry.nativePreview != null) {
-            capturingEntry.uploadNativePreview();
-            restoreAfterCapture(minecraft);
-            me.voidxwalker.worldpreview.WorldPreview.deactivateExternal();
-            capturingEntry = null;
-            capturingPreview = null;
-            captureTicks = 0;
-            captureRequested = false;
-         }
-
-         return;
-      }
-
-      for (QueueEntry entry : ENTRIES) {
-         if (entry.state == QueueEntry.State.READY && entry.mapColors != null
-            && entry.previewTexture == null && entry.nativePreview == null && entry.server != null) {
-            capturingPreview = me.voidxwalker.worldpreview.ExternalPreview.build(minecraft, entry.server, previewRadius(entry));
-
-            if (capturingPreview != null) {
-               me.voidxwalker.worldpreview.WorldPreview.activateExternal(
-                  new me.voidxwalker.worldpreview.WorldPreviewProperties(
-                     capturingPreview.level, capturingPreview.listener, capturingPreview.gameMode, capturingPreview.player, capturingPreview.spawn
-                  )
-               );
-               capturingEntry = entry;
-               captureTicks = 0;
-               captureRequested = false;
-               LOGGER.info("[seedqueue] capturing 3D preview for entry #{}", entry.number);
-            }
-
-            break;
-         }
-      }
-   }
-
-   private static java.nio.file.Path findNewScreenshot() {
-      try {
-         java.nio.file.Path dir = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("screenshots");
-
-         if (!java.nio.file.Files.isDirectory(dir)) {
-            return null;
-         }
-
-         try (var stream = java.nio.file.Files.list(dir)) {
-            return stream.filter(p -> p.getFileName().toString().endsWith(".png"))
-               .filter(p -> {
-                  try {
-                     return java.nio.file.Files.getLastModifiedTime(p).toMillis() >= captureStartMillis;
-                  } catch (Throwable t) {
-                     return false;
-                  }
-               })
-               .max(java.util.Comparator.comparingLong(p -> {
-                  try {
-                     return java.nio.file.Files.getLastModifiedTime(p).toMillis();
-                  } catch (Throwable t) {
-                     return 0L;
-                  }
-               }))
-               .orElse(null);
-         }
-      } catch (Throwable t) {
-         return null;
-      }
-   }
-
    /** Called at the end of a frame: grabs the preview window image and keeps the wall hidden. */
    private static int wallDumpTicks;
 
@@ -1297,8 +898,8 @@ public final class SeedQueue implements ClientModInitializer {
       // saving screen never stays visible.
 
 
-      if (captureFrameActive && --captureHold <= 0) {
-         captureFrameActive = false;
+      if (PreviewCapture.active && --PreviewCapture.hold <= 0) {
+         PreviewCapture.active = false;
          me.voidxwalker.worldpreview.WorldPreview.instanceRendering = false;
       }
 
@@ -1334,7 +935,7 @@ public final class SeedQueue implements ClientModInitializer {
       }
 
       offscreenPending = false;
-      QueueEntry entry = capturingEntry;
+      QueueEntry entry = PreviewCapture.entry;
       me.voidxwalker.worldpreview.WorldPreview.captureTargetImage(image -> {
          if (entry != null) {
             entry.nativePreview = image;
@@ -1343,21 +944,7 @@ public final class SeedQueue implements ClientModInitializer {
       me.voidxwalker.worldpreview.WorldPreview.restoreMainTarget(minecraft);
    }
    public static void restoreAfterCapture(Minecraft minecraft) {
-      if (!captureFrameActive) {
-         return;
-      }
-
-      if (captureSavedScreen != null) {
-         minecraft.gui.setScreen(captureSavedScreen);
-         captureSavedScreen = null;
-      }
-
-      if (captureHudHidden) {
-         minecraft.gui.hud.toggle();
-         captureHudHidden = false;
-      }
-
-      captureFrameActive = false;
+      PreviewCapture.restore(minecraft);
    }
 
    private static boolean wallEnabled() {
@@ -1396,7 +983,7 @@ public final class SeedQueue implements ClientModInitializer {
 
    /** Runs while the wall is open: auto-join scheduled worlds and drive the benchmark mode. */
    private static void wallScheduledTick(Minecraft minecraft) {
-      if (handoffPreviewEntry != null) {
+      if (PreviewState.handoffPreviewEntry != null) {
          return;
       }
 
@@ -1417,8 +1004,8 @@ public final class SeedQueue implements ClientModInitializer {
             if (entry.state == QueueEntry.State.READY && !entry.locked) {
                ENTRIES.remove(entry);
 
-               if (frameSwapEntry == entry) {
-                  frameSwapEntry = null;
+               if (PreviewState.frameSwapEntry == entry) {
+                  PreviewState.unbind();
                }
 
                discardAsync(entry);
@@ -1550,7 +1137,7 @@ public final class SeedQueue implements ClientModInitializer {
       joinInProgress = false;
       joinedFromWall = false;
       wallShown = false;
-      frameSwapEntry = null;
+      PreviewState.unbind();
 
       try {
          me.voidxwalker.worldpreview.WorldPreview.keepSodiumBound = false;
@@ -1569,6 +1156,7 @@ public final class SeedQueue implements ClientModInitializer {
 
    /** Opens the wall. Returns true when it was actually opened (false when it was already up). */
    public static boolean openWall(Minecraft minecraft) {
+
       // Cards must always be first person: the third-person-back camera sits behind the player and
       // looks at world that was never generated, leaving a black band. The preview renders through the
       // global camera type, so it has to be forced while the wall owns the screen.
@@ -2001,8 +1589,7 @@ public final class SeedQueue implements ClientModInitializer {
          break;
       }
    }
-
-   private static boolean wallPreviewEnabled() {
+   static boolean wallPreviewEnabled() {
       return Boolean.parseBoolean(System.getProperty("seedqueue.wallPreview", "true"));
    }
 
@@ -2251,7 +1838,7 @@ public final class SeedQueue implements ClientModInitializer {
     * displayed, so the switch to the client level happens on identical pixels.
     */
    private static void handoffTick(Minecraft minecraft) {
-      if (handoffPreviewEntry == null) {
+      if (PreviewState.handoffPreviewEntry == null) {
          return;
       }
 
@@ -2265,11 +1852,11 @@ public final class SeedQueue implements ClientModInitializer {
          minecraft.gui.setScreen(null);
       }
 
-      var previewLevel = handoffPreviewEntry.externalPreview == null ? null : handoffPreviewEntry.externalPreview.level;
-      Object previewPlayer = handoffPreviewEntry.externalPreview == null ? null : handoffPreviewEntry.externalPreview.player;
+      var previewLevel = PreviewState.handoffPreviewEntry.externalPreview == null ? null : PreviewState.handoffPreviewEntry.externalPreview.level;
+      Object previewPlayer = PreviewState.handoffPreviewEntry.externalPreview == null ? null : PreviewState.handoffPreviewEntry.externalPreview.player;
 
-      if (handoffPreviewEntry.renderProperties != null && handoffPreviewEntry.renderProperties.player != null) {
-         previewPlayer = handoffPreviewEntry.renderProperties.player;
+      if (PreviewState.handoffPreviewEntry.renderProperties != null && PreviewState.handoffPreviewEntry.renderProperties.player != null) {
+         previewPlayer = PreviewState.handoffPreviewEntry.renderProperties.player;
       }
 
       // The seamless join reuses the preview level as the client level, so "level changed" never
@@ -2296,15 +1883,16 @@ public final class SeedQueue implements ClientModInitializer {
          }
 
          me.voidxwalker.worldpreview.WorldPreview.rebindRealLevel(minecraft);
+      PreviewState.renderDistance = -1;
 
          if (minecraft.gui.screen() instanceof net.minecraft.client.gui.screens.LevelLoadingScreen) {
             minecraft.gui.setScreen(null);
          }
 
-         alignPlayerToPreviewedSpawn(handoffPreviewEntry, minecraft);
+         alignPlayerToPreviewedSpawn(PreviewState.handoffPreviewEntry, minecraft);
 
          LOGGER.info("[seedqueue] hand-off complete after {} ticks (preview released)", handoffTicks);
-         handoffPreviewEntry = null;
+         PreviewState.handoffPreviewEntry = null;
          joinInProgress = false;
       }
    }
@@ -2403,8 +1991,36 @@ public final class SeedQueue implements ClientModInitializer {
    }
 
    /** Ticks for which the preview rotation is paused after the client switched level (respawn). */
-   private static int previewPauseTicks;
+
    private static Object lastPauseLevel;
+
+   private static java.lang.reflect.Field nextTickTimeField;
+   private static boolean nextTickTimeResolved;
+
+   /** Clears the tick deadline of a server that was just unparked, so it does not report being behind. */
+   public static void resetTickTiming(Object server) {
+      try {
+         if (!nextTickTimeResolved) {
+            nextTickTimeResolved = true;
+
+            for (Class<?> type = server.getClass(); type != null; type = type.getSuperclass()) {
+               try {
+                  java.lang.reflect.Field field = type.getDeclaredField("nextTickTimeNanos");
+                  field.setAccessible(true);
+                  nextTickTimeField = field;
+                  break;
+               } catch (NoSuchFieldException ignored) {
+               }
+            }
+         }
+
+         if (nextTickTimeField != null) {
+            nextTickTimeField.setLong(server, net.minecraft.util.Util.timeSource().getAsLong());
+         }
+      } catch (Throwable t) {
+         LOGGER.warn("[seedqueue] could not reset the tick timing of an unparked server", t);
+      }
+   }
 
    public static void tick(Minecraft minecraft) {
       SodiumLevelCache.processPending();
@@ -2414,13 +2030,25 @@ public final class SeedQueue implements ClientModInitializer {
       if (minecraft.level != lastPauseLevel) {
          lastPauseLevel = minecraft.level;
 
-         if (!joinInProgress) {
-            previewPauseTicks = Math.max(0, Integer.getInteger("seedqueue.respawnPauseTicks", 80));
-         }
-      }
+         // Leaving a world *to the wall* also changes the level; the wall must refill immediately, so the
+         // pause only applies when the client is actually rebuilding a level it is going to render.
+         if (!joinInProgress && !(minecraft.gui.screen() instanceof WallScreen)) {
+            // Respawning (or changing dimension) replaces the client level: Sodium rebuilds its whole
+            // section graph for the new level, so release the preview binding and free the preview
+            // managers first instead of letting their arenas compete with that rebuild.
+            try {
+               if (PreviewState.frameSwapEntry != null) {
+                  me.voidxwalker.worldpreview.WorldPreview.deactivateExternal();
+                  PreviewState.unbind();
+               }
 
-      if (previewPauseTicks > 0) {
-         previewPauseTicks--;
+               SodiumLevelCache.evictAllExcept(minecraft.level);
+            } catch (Throwable t) {
+               LOGGER.warn("[seedqueue] failed to release previews after a level change", t);
+            }
+
+            LOGGER.info("[seedqueue] level changed, previews released");
+         }
       }
 
       // Whatever started the join (wall click, Atum gold boots, a queued reset), once the client owns
@@ -2456,6 +2084,7 @@ public final class SeedQueue implements ClientModInitializer {
             // Level and player exist: the hand-over is complete. Closing the wall only now keeps the
             // title/loading screens from flashing in between.
             me.voidxwalker.worldpreview.WorldPreview.rebindRealLevel(minecraft);
+      PreviewState.renderDistance = -1;
             suppressLoadingScreens = false;
             suppressTicks = 0;
             joinInProgress = false;
@@ -2466,8 +2095,15 @@ public final class SeedQueue implements ClientModInitializer {
 
             // Dismiss the wall *and* the vanilla "Preparing world generation" screen: the world is
             // already playable at this point, leaving it up locked the player out of the game.
-            if (minecraft.gui.screen() instanceof WallScreen
-               || minecraft.gui.screen() instanceof net.minecraft.client.gui.screens.LevelLoadingScreen) {
+            // Anything that still sits on top of a playable world has to go: the title screen used to be
+            // left behind over the joined world, and a leftover BlankScreen swallowed the escape key.
+            net.minecraft.client.gui.screens.Screen open = minecraft.gui.screen();
+
+            if (open instanceof WallScreen
+               || open instanceof net.minecraft.client.gui.screens.LevelLoadingScreen
+               || open instanceof net.minecraft.client.gui.screens.TitleScreen
+               || open instanceof net.minecraft.client.gui.screens.ProgressScreen
+               || open instanceof BlankScreen) {
                minecraft.gui.setScreen(null);
             }
          } else if (++suppressTicks > 400) {
@@ -2477,7 +2113,7 @@ public final class SeedQueue implements ClientModInitializer {
             suppressLoadingScreens = false;
             joinInProgress = false;
 
-            if (minecraft.gui.screen() instanceof WallScreen) {
+            if (minecraft.gui.screen() instanceof WallScreen || minecraft.gui.screen() instanceof BlankScreen) {
                minecraft.gui.setScreen(null);
             }
          }
@@ -2488,7 +2124,7 @@ public final class SeedQueue implements ClientModInitializer {
       // second join. When the join did not go through the wall (wallOpenedInWorld) this cannot fire.
       if (!wallOpenedInWorld
          && joinedFromWall
-         && handoffPreviewEntry == null
+         && PreviewState.handoffPreviewEntry == null
          && minecraft.level != null
          && minecraft.player != null
          && minecraft.gui.screen() instanceof WallScreen) {
@@ -2497,12 +2133,13 @@ public final class SeedQueue implements ClientModInitializer {
          stopPreviewCycle(minecraft);
          me.voidxwalker.worldpreview.WorldPreview.releasePreviewCameraAndEntities(minecraft);
          me.voidxwalker.worldpreview.WorldPreview.rebindRealLevel(minecraft);
+      PreviewState.renderDistance = -1;
          minecraft.gui.setScreen(null);
       }
 
       // A preview must never keep owning the client level/camera once the player is in a world.
       if (joinedFromWall
-         && handoffPreviewEntry == null
+         && PreviewState.handoffPreviewEntry == null
          && minecraft.level != null
          && minecraft.player != null
          && !(minecraft.gui.screen() instanceof WallScreen)
@@ -2520,6 +2157,7 @@ public final class SeedQueue implements ClientModInitializer {
          }
 
          me.voidxwalker.worldpreview.WorldPreview.rebindRealLevel(minecraft);
+      PreviewState.renderDistance = -1;
       }
 
       applyGenerationPermits(minecraft);
@@ -2700,11 +2338,11 @@ public final class SeedQueue implements ClientModInitializer {
       }
 
       if (grabHoldTicks > 0 && --grabHoldTicks == 0) {
-         captureFrameActive = false;
+         PreviewCapture.active = false;
          me.voidxwalker.worldpreview.WorldPreview.suppressDebugOverlay = false;
       }
 
-      if ((activePreviewEntry != null || pendingGrab)
+      if ((PreviewState.activePreviewEntry != null || pendingGrab)
          && minecraft.level != null && minecraft.gui.screen() == null) {
          stopPreviewCycle(minecraft);
       }
@@ -2739,7 +2377,7 @@ public final class SeedQueue implements ClientModInitializer {
                LOGGER.info(
                   "[seedqueue] wall ticks={} active={} entries={} fps={} sodiumCache={} heap={}MB screen={}",
                   wallOpenTicks,
-                  activePreviewEntry != null,
+                  PreviewState.activePreviewEntry != null,
                   ENTRIES.size(),
                   minecraft.getFps(),
                   SodiumLevelCache.size(),
@@ -2841,7 +2479,7 @@ public final class SeedQueue implements ClientModInitializer {
          }
 
          if (frameCaptureWaiting && frameCaptureEntry != null) {
-         java.nio.file.Path shot = findNewScreenshot();
+         java.nio.file.Path shot = PreviewPipeline.findNewScreenshot();
 
          if (shot != null) {
             try {
@@ -2908,9 +2546,9 @@ public final class SeedQueue implements ClientModInitializer {
          }
 
          if (Boolean.getBoolean("seedqueue.previewShotTest") && !previewShotDone
-         && minecraft.gui.screen() instanceof WallScreen && activePreviewEntry != null) {
+         && minecraft.gui.screen() instanceof WallScreen && PreviewState.activePreviewEntry != null) {
          previewShotDone = true;
-         captureFrameActive = true;
+         PreviewCapture.active = true;
          net.minecraft.client.Screenshot.grab(minecraft, false);
          LOGGER.info("[seedqueue] preview window shot requested");
       }
@@ -3353,8 +2991,8 @@ public final class SeedQueue implements ClientModInitializer {
          if (!entry.locked && !entry.transferred) {
             ENTRIES.remove(entry);
 
-            if (frameSwapEntry == entry) {
-               frameSwapEntry = null;
+            if (PreviewState.frameSwapEntry == entry) {
+               PreviewState.unbind();
             }
 
             discardAsync(entry);
@@ -3459,8 +3097,8 @@ public final class SeedQueue implements ClientModInitializer {
          entry.externalPreview.activateSections();
          me.voidxwalker.worldpreview.WorldPreview.prepareExternal(minecraft);
          me.voidxwalker.worldpreview.WorldPreview.forceLevelRender = true;
-         frameSwapEntry = entry;
-         frameSwapDwellUntil = Long.MAX_VALUE;
+         PreviewState.bind(entry);
+         PreviewState.frameSwapDwellUntil = Long.MAX_VALUE;
          LOGGER.info("[seedqueue] prepared preview for hand-off of #{}", entry.number);
          return true;
       } catch (Throwable t) {
@@ -3481,6 +3119,13 @@ public final class SeedQueue implements ClientModInitializer {
 
    /** Refills the queue after a wall reset/delete, mirroring the 1.21.4 refillAfterReset. */
    public static void refillQueue(Minecraft minecraft) {
+
+      // While the player is actually playing in a world the queue stays frozen; it refills when the
+      // wall is shown again. Generating in the background only costs frames here.
+      if (minecraft.level != null && minecraft.player != null && !wallShown) {
+         return;
+      }
+
       long unlocked = ENTRIES.stream().filter(entry -> !entry.locked).count();
 
       while (unlocked < queueSize()) {
@@ -3524,8 +3169,8 @@ public final class SeedQueue implements ClientModInitializer {
 
          ENTRIES.remove(entry);
 
-         if (frameSwapEntry == entry) {
-            frameSwapEntry = null;
+         if (PreviewState.frameSwapEntry == entry) {
+            PreviewState.unbind();
          }
 
          // Never halt a server from the render thread: the server may still be generating chunks and
@@ -3560,8 +3205,8 @@ public final class SeedQueue implements ClientModInitializer {
          resizeTarget(entry.displayTarget, width, height);
       }
 
-      if (frameSwapEntry != null) {
-         resizeTarget(frameSwapEntry.displayTarget, width, height);
+      if (PreviewState.frameSwapEntry != null) {
+         resizeTarget(PreviewState.frameSwapEntry.displayTarget, width, height);
       }
 
       WallPreview.resizeScratch(width, height);
@@ -3583,10 +3228,10 @@ public final class SeedQueue implements ClientModInitializer {
    /** Stops the wall preview cycle; the preview world itself can be kept for a seamless join. */
    private static boolean stopWallPreview(Minecraft minecraft, QueueEntry keep) {
       boolean keepPreview = keep != null
-         && frameSwapEntry == keep
+         && PreviewState.frameSwapEntry == keep
          && me.voidxwalker.worldpreview.WorldPreview.isActive();
 
-      frameSwapEntry = null;
+      PreviewState.unbind();
       stopPreviewCycle(minecraft);
 
       if (!keepPreview && me.voidxwalker.worldpreview.WorldPreview.isActive()) {
@@ -3691,6 +3336,15 @@ public final class SeedQueue implements ClientModInitializer {
 
       Minecraft minecraft = Minecraft.getInstance();
 
+      // The wall draws the preview of a ready instance, but the preview itself is built a moment later.
+      // Joining in between handed the client a level without a preview and left the title screen drawn
+      // over the world, so entering is refused until the preview exists (or was explicitly skipped).
+      if (QueueConfig.useWall && entry.externalPreview == null && entry.previewTexture == null) {
+         entry.scheduledJoin = true;
+         LOGGER.info("[seedqueue] entry #{} has no preview yet, scheduled join", entry.number);
+         return false;
+      }
+
       if (QueueConfig.waitForPreviewSetup) {
          ensurePreview(minecraft, entry);
       }
@@ -3716,7 +3370,7 @@ public final class SeedQueue implements ClientModInitializer {
          if (previewKept) {
             // The preview world is already the queued world: keep it on screen and drop the vanilla
             // loading screen, so the client level swap is invisible (WorldPreview hands over later).
-            handoffPreviewEntry = entry;
+            PreviewState.handoffPreviewEntry = entry;
             handoffTicks = 0;
 
             if (minecraft.gui.screen() instanceof net.minecraft.client.gui.screens.LevelLoadingScreen) {

@@ -25,6 +25,10 @@ public final class WallScreen extends Screen {
    private final List<QueueEntry> mainScratch = new java.util.ArrayList<>();
    private final List<QueueEntry> preparingScratch = new java.util.ArrayList<>();
    private final List<QueueEntry> lockedScratch = new java.util.ArrayList<>();
+   /** Rectangles recycled across frames, so rendering the wall does not allocate. */
+   private final List<int[]> rectPool = new java.util.ArrayList<>();
+   private int rectPoolIndex;
+   private final List<QueueEntry> lastLockedSnapshot = new java.util.ArrayList<>();
    private static QueueEntry hoveredEntry;
    private static volatile long joinSlideStartedAt;
    private int slideOffset;
@@ -58,6 +62,10 @@ public final class WallScreen extends Screen {
 
    @Override
    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+      if (event.isEscape() && WallKeybindings.key(WallKeybindings.Action.QUIT) != com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE) {
+         // Escape only closes the wall when "Quit Wall Screen" is actually bound to it.
+         return true;
+      }
       if (QueueConfig.showDebugMenu && event.key() == com.mojang.blaze3d.platform.InputConstants.KEY_F3) {
          QueueEntry entry = hoveredEntry;
 
@@ -75,6 +83,20 @@ public final class WallScreen extends Screen {
       WallKeybindings.Action action = WallKeybindings.match(event);
       QueueEntry hovered = hoveredEntry;
 
+      if (action != null && this.performAction(action, hovered)) {
+         return true;
+      }
+
+      if (event.isEscape()) {
+         this.onClose();
+         return true;
+      }
+
+      return super.keyPressed(event);
+   }
+
+   /** Runs one wall action; shared by keyboard and mouse input. */
+   private boolean performAction(WallKeybindings.Action action, QueueEntry hovered) {
       if (action != null) {
          switch (action) {
             case PLAY:
@@ -157,13 +179,7 @@ public final class WallScreen extends Screen {
                break;
          }
       }
-
-      if (event.isEscape()) {
-         this.onClose();
-         return true;
-      }
-
-      return super.keyPressed(event);
+      return false;
    }
 
    /** All cards of a group (0 = main, 1 = preparing, 2 = locked) that may be reset. */
@@ -245,8 +261,8 @@ public final class WallScreen extends Screen {
    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
       int button = event.button();
 
-      // Only left (join), right (lock) and middle (discard) do anything. Mouse side buttons (SDL 4/5,
-      // and anything above) are ignored so a side click never starts another world ("ghost").
+      // Only left (join), right (lock) and middle (discard) do anything. Mouse side buttons are
+      // ignored so a side click never starts another world.
       if (button != BUTTON_LEFT && button != BUTTON_MIDDLE && button != BUTTON_RIGHT) {
          return false;
       }
@@ -371,6 +387,7 @@ public final class WallScreen extends Screen {
       this.cardRects.clear();
       this.cardGroups.clear();
       this.cardCosmetic.clear();
+      this.rectPoolIndex = 0;
       hoveredEntry = null;
 
       if (!WALL_CLEAR_BACKGROUND) {
@@ -445,6 +462,19 @@ public final class WallScreen extends Screen {
       }
    }
 
+   private int[] rectAt(int x, int y, int x2, int y2) {
+      if (this.rectPoolIndex >= this.rectPool.size()) {
+         this.rectPool.add(new int[4]);
+      }
+
+      int[] rect = this.rectPool.get(this.rectPoolIndex++);
+      rect[0] = x;
+      rect[1] = y;
+      rect[2] = x2;
+      rect[3] = y2;
+      return rect;
+   }
+
    private void drawSlot(
       GuiGraphicsExtractor graphics,
       QueueEntry entry,
@@ -480,8 +510,10 @@ public final class WallScreen extends Screen {
       imageHeight = cardHeight;
 
       if (entry != null) {
-         this.cardBounds.add(new int[] { x, y, x + cardWidth, y + cardHeight });
-         this.cardRects.add(new int[] { x, y, x + cardWidth, y + cardHeight });
+         // Reuse the rectangle arrays instead of allocating a new one per card per frame.
+         int[] rect = this.rectAt(x, y, x + cardWidth, y + cardHeight);
+         this.cardBounds.add(rect);
+         this.cardRects.add(rect);
          this.cardEntries.add(entry);
          this.cardGroups.add(group);
          this.cardCosmetic.add(slot.cosmetic);

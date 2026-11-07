@@ -1,6 +1,7 @@
 package me.contaria.seedqueue.mixin;
 
 import me.contaria.seedqueue.SeedQueue;
+import me.contaria.seedqueue.WallKeybindings;
 import net.minecraft.client.KeyboardHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.KeyEvent;
@@ -10,28 +11,32 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * F6 is Atum's reset key; the wall only borrows it while the player is actually playing in a world.
+ * Handles the configurable "back to wall" key while the player is actually playing in a world.
  *
- * <p>Inside a world F6 goes straight back to the wall (no saving screen). Everywhere else - title
- * screen, wall, loading screens - the key is left to Atum, so F6 keeps starting a new world exactly
- * like it does without SeedQueue. The wall no longer has a key of its own (F7 was removed).</p>
+ * <p>Escape used to be handled here as well because it looked broken, but 26.3 screens decide with
+ * {@code KeyEvent#isEscape()} and the pause code works too, so the extra handler only processed every
+ * press twice and made the screen flicker. Escape is left to vanilla again.</p>
  */
 @Mixin(value = KeyboardHandler.class, priority = 500)
 public class KeyboardHandlerMixin {
    @Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
    private void seedqueue$backToWallKey(long window, int key, KeyEvent event, CallbackInfo ci) {
-      if (event.key() != com.mojang.blaze3d.platform.InputConstants.KEY_F6) {
+      Minecraft client = Minecraft.getInstance();
+
+      // Only while playing: with a screen open the press belongs to that screen. Without this check a
+      // key press in the wall key binding screen triggered the wall return instead of binding the key.
+      if (client.gui.screen() != null || client.level == null) {
          return;
       }
 
-      Minecraft minecraft = Minecraft.getInstance();
+      int backToWall = WallKeybindings.key(WallKeybindings.Action.BACK_TO_WALL);
 
-      if (SeedQueue.returnToWallFromJoinedWorld(minecraft)) {
+      if (backToWall == WallKeybindings.UNKNOWN || WallKeybindings.keyOf(event) != backToWall) {
+         return;
+      }
+
+      if (SeedQueue.returnToWallFromJoinedWorld(client)) {
          ci.cancel();
-         return;
       }
-
-      // Outside a world the key is disabled entirely: it must not reset the game either.
-      ci.cancel();
    }
 }

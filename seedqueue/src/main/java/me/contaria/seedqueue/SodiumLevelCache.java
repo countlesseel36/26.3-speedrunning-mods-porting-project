@@ -119,23 +119,43 @@ public final class SodiumLevelCache {
 
    /** Render thread: destroys managers of discarded preview levels. */
    public static void processPending() {
-      if (PENDING_EVICT.isEmpty()) {
+      if (SeedQueue.shuttingDown || PENDING_EVICT.isEmpty()) {
          return;
       }
 
-      for (ClientLevel level : new ArrayList<>(PENDING_EVICT)) {
-         Object manager = remove(level);
-         PREVIEW_LEVELS.remove(level);
-         SeedQueue.LOGGER.info(
-            "[seedqueue] sodium: evicting level {} manager={} (cache={})",
-            System.identityHashCode(level),
-            System.identityHashCode(manager),
-            MANAGERS.size()
-         );
-         destroy(manager);
+      // At most two managers per tick. Tearing several down in a single frame made Sodium allocate a
+      // fresh shared arena (256 MiB) while the old ones were still being freed, which ended in a
+      // GpuOutOfMemoryException crash; draining a large backlog one per tick was too slow.
+      int budget = PENDING_EVICT.size() > 4 ? 2 : 1;
+
+      for (int i = 0; i < budget && !PENDING_EVICT.isEmpty(); i++) {
+         destroyOne();
       }
 
-      PENDING_EVICT.clear();
+      if (SeedQueue.shuttingDown || PENDING_EVICT.isEmpty()) {
+         SeedQueue.LOGGER.info("[seedqueue] sodium: eviction queue drained");
+      }
+   }
+
+   private static void destroyOne() {
+      ClientLevel level = PENDING_EVICT.iterator().next();
+      PENDING_EVICT.remove(level);
+      Object manager = remove(level);
+      PREVIEW_LEVELS.remove(level);
+      if (Boolean.getBoolean("seedqueue.sodiumLog")) {
+         SeedQueue.LOGGER.info(
+            "[seedqueue] sodium: evicting level {} manager={} (cache={}, pending={})",
+            System.identityHashCode(level),
+            System.identityHashCode(manager),
+            MANAGERS.size(),
+            PENDING_EVICT.size()
+         );
+      }
+      destroy(manager);
+
+      if (SeedQueue.shuttingDown || PENDING_EVICT.isEmpty()) {
+         SeedQueue.LOGGER.info("[seedqueue] sodium: eviction queue drained");
+      }
    }
 
    private static void destroy(Object manager) {

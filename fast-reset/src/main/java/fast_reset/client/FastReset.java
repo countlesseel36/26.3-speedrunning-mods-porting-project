@@ -20,6 +20,11 @@ public class FastReset implements ModInitializer {
 
    /** false while a save-less quit is in progress. Cross-thread, hence volatile. */
    public static volatile boolean saveOnQuit = true;
+   /**
+    * True only while the "Quit to Title" button is disconnecting. Saves are skipped for that window
+    * only, so a shutdown hook or a crash still writes the world.
+    */
+   public static volatile boolean skipSavesNow;
 
    /** 0 = bottom right, 1 = centered (same as the original mod). */
    public static int buttonLocation;

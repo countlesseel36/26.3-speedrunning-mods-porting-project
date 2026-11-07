@@ -19,6 +19,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class KeyboardHandlerMixin {
    @Inject(method = "keyPress", at = @At("HEAD"))
    private void atum$captureResetKey(long window, int key, KeyEvent event, CallbackInfo ci) {
+      if (Atum.injectingKey || !Atum.RESET_KEY_ENABLED) {
+         return;
+      }
       // F6 must work globally: the keyboard handler runs before screen input handling, so this
       // also catches the key while the loading preview, the create-world screen, chat or any
       // other screen would otherwise swallow it.

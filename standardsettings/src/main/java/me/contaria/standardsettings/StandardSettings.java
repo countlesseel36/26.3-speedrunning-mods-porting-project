@@ -54,11 +54,53 @@ public class StandardSettings {
       LOGGER.info("Loaded StandardSettings on World Join");
    }
 
+   private static boolean appliedAtStartup;
+   private static Object lastAppliedLevel;
+
+   /**
+    * Applies the configured defaults once at startup and again whenever a world is joined.
+    *
+    * <p>The original mod relied on {@code Minecraft#doWorldLoad} and the level loading screen, but a
+    * SeedQueue world is joined without either of them, so the settings were never applied at all.</p>
+    */
+   public static void tick() {
+      // Escape hatch for isolating input/pause problems: -Dstandardsettings.disableAutoApply=true keeps the
+      // settings from being pushed into the vanilla options automatically.
+      if (Boolean.getBoolean("standardsettings.disableAutoApply")) {
+         return;
+      }
+
+      Minecraft client = Minecraft.getInstance();
+
+      if (!appliedAtStartup) {
+         appliedAtStartup = true;
+         reset();
+      }
+
+      if (client.level != lastAppliedLevel) {
+         lastAppliedLevel = client.level;
+
+         if (client.level != null) {
+            onWorldJoin();
+         }
+      }
+   }
+
+   private static boolean videoModeApplied;
+
    public static void updateSettings() {
       Minecraft client = Minecraft.getInstance();
       Window window = client.getWindow();
-      window.changeFullscreenVideoMode();
-      if (window.getGuiScale() != (Integer)client.options.guiScale().get()) {
+
+      // Recreating the swap surface on every world join made the game lose its window surface
+      // ("Cannot acquire minimized window") and swallow key input, so only touch it once per launch.
+      if (!videoModeApplied || Boolean.getBoolean("standardsettings.reapplyVideoMode")) {
+         videoModeApplied = true;
+         window.changeFullscreenVideoMode();
+      }
+      boolean guiScaleChanged = window.getGuiScale() != (Integer)client.options.guiScale().get();
+
+      if (guiScaleChanged) {
          client.resizeGui();
       }
 
@@ -72,6 +114,8 @@ public class StandardSettings {
          languageManager.onResourceManagerReload(client.getResourceManager());
       }
 
+      boolean applied = guiScaleChanged;
+
       if (compareMipMap()) {
          client.updateMaxMipLevel((Integer)client.options.mipmapLevels().get());
          SimpleReloadInstance.create(
@@ -84,11 +128,17 @@ public class StandardSettings {
             )
             .done()
             .join();
+         // Re-baseline: without this the comparison above stays true forever and every world join
+         // re-ran a full synchronous resource reload (a very visible stutter when entering a world).
+         cacheMipMap();
+         applied = true;
       }
 
-      KeyMapping.resetMapping();
-      client.options.save();
-      client.debugEntries.save();
+      if (applied) {
+         KeyMapping.resetMapping();
+         client.options.save();
+         client.debugEntries.save();
+      }
    }
 
    public static void createCache() {
@@ -122,12 +172,20 @@ public class StandardSettings {
          options.add(setting.getID() + ":" + setting.get());
       }
 
-      try {
-         Files.write(Minecraft.getInstance().getLevelSource().getBaseDir().resolve(worldName).resolve("standardoptions.txt"), options, StandardCharsets.UTF_8);
-         LOGGER.info("Saved standardoptions to world file.");
-      } catch (IOException e) {
-         LOGGER.warn("Failed to save standardoptions to world file.", e);
-      }
+      // Writing the file used to happen on the render thread; hand it to the background executor.
+      java.util.List<String> snapshot = java.util.List.copyOf(options);
+      net.minecraft.util.Util.backgroundExecutor().execute(() -> {
+         try {
+            Files.write(
+               Minecraft.getInstance().getLevelSource().getBaseDir().resolve(worldName).resolve("standardoptions.txt"),
+               snapshot,
+               StandardCharsets.UTF_8
+            );
+            LOGGER.info("Saved standardoptions to world file.");
+         } catch (IOException e) {
+            LOGGER.warn("Failed to save standardoptions to world file.", e);
+         }
+      });
    }
 
    public static boolean isEnabled() {

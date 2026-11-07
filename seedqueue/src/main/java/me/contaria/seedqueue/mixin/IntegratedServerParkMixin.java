@@ -21,7 +21,14 @@ public abstract class IntegratedServerParkMixin {
       QueueEntry entry = ((QueueServer)this).seedqueue$getEntry();
 
       if (entry != null) {
+         boolean wasParked = entry.parked;
          entry.awaitUnpark();
+
+         if (wasParked) {
+            // "nextTickTimeNanos" lives on MinecraftServer, so it cannot be shadowed from a mixin into
+            // IntegratedServer; reset it through reflection instead of breaking mixin application.
+            me.contaria.seedqueue.SeedQueue.resetTickTiming(this);
+         }
       }
    }
 }

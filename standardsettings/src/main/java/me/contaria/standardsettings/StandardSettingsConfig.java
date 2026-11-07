@@ -441,12 +441,21 @@ public class StandardSettingsConfig implements SpeedrunConfig {
    }
 
    private void toggleAll(boolean enabled) {
+      // One broken setting must not stop the rest from being toggled.
       for (StandardSetting<?> setting : StandardSettings.config.standardSettings) {
-         setting.setEnabled(enabled);
+         try {
+            setting.setEnabled(enabled);
+         } catch (Throwable t) {
+            StandardSettings.LOGGER.warn("Failed to toggle '{}'", setting.getID(), t);
+         }
       }
 
       for (StandardSetting<?> setting : StandardSettings.config.standardSettingsOnWorldJoin) {
-         setting.setEnabled(enabled);
+         try {
+            setting.setEnabled(enabled);
+         } catch (Throwable t) {
+            StandardSettings.LOGGER.warn("Failed to toggle '{}'", setting.getID(), t);
+         }
       }
    }
 

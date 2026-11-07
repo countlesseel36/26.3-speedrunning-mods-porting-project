@@ -54,6 +54,18 @@ public class Atum implements ModInitializer {
    private static int restoreFastResetSavingTicks;
    private static boolean loadResetSmokeDone;
    private static int loadResetSmokeTicks;
+   /** True while Atum is injecting a synthetic key event, so handlers can ignore it. */
+   public static volatile boolean injectingKey;
+   /**
+    * SeedQueue takes over joining, resetting and the F6 key while it is installed: Atum then only
+    * provides its create-world settings (difficulty, structures, bonus chest) which SeedQueue reads.
+    * Without SeedQueue, Atum behaves like upstream.
+    */
+   public static final boolean SEEDQUEUE_PRESENT = net.fabricmc.loader.api.FabricLoader.getInstance()
+      .isModLoaded("seedqueue");
+   /** Single-world reset and its key are disabled whenever SeedQueue is installed. */
+   public static final boolean RESET_KEY_ENABLED = !SEEDQUEUE_PRESENT && Boolean.getBoolean("atum.resetKeyEnabled");
+
    private static final boolean RESET_DURING_PREVIEW_SMOKE = Boolean.getBoolean("atum.resetDuringPreview");
    private static final boolean SIMULATE_F6_DURING_PREVIEW = Boolean.getBoolean("atum.simulateF6DuringPreview");
 
@@ -87,7 +99,13 @@ public class Atum implements ModInitializer {
       LOGGER.info("Initializing Atum (26.3 port)");
 
       KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("atum", "keys"));
-      resetKey = new KeyMapping("key.atum.reset", InputConstants.KEY_F6, category);
+      // With SeedQueue installed the reset key is unbound entirely (SeedQueue owns F6 as "back to
+      // wall"); without SeedQueue it stays on F6 like upstream.
+      resetKey = new KeyMapping(
+         "key.atum.reset",
+         RESET_KEY_ENABLED ? InputConstants.KEY_F6 : InputConstants.UNKNOWN.getValue(),
+         category
+      );
 
       configFile = FabricLoader.getInstance().getConfigDir().resolve("atum").resolve("atum.properties");
       load();
@@ -144,7 +162,7 @@ public class Atum implements ModInitializer {
          }
       }
 
-      if (resetKey != null) {
+      if (RESET_KEY_ENABLED && resetKey != null) {
          while (resetKey.consumeClick()) {
             scheduleReset();
          }
@@ -208,11 +226,19 @@ public class Atum implements ModInitializer {
             loadResetSmokeDone = true;
             LOGGER.info("[smoke] pressing F6 during the world preview");
             if (SIMULATE_F6_DURING_PREVIEW) {
-               minecraft.keyboardHandler.keyPress(
-                  minecraft.getWindow().handle(),
-                  InputConstants.KEY_F6,
-                  new net.minecraft.client.input.KeyEvent(InputConstants.KEY_F6, 0, 0)
-               );
+               // The injected event also reaches our own KeyboardHandler mixin, which would schedule the
+               // reset a second time; the flag tells it this press is synthetic.
+               injectingKey = true;
+
+               try {
+                  minecraft.keyboardHandler.keyPress(
+                     minecraft.getWindow().handle(),
+                     InputConstants.KEY_F6,
+                     new net.minecraft.client.input.KeyEvent(InputConstants.KEY_F6, 0, 0)
+                  );
+               } finally {
+                  injectingKey = false;
+               }
             } else {
                scheduleReset();
             }

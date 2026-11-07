@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "worldpreview",
-  "version": "6.3.0-beta.42+26.3",
+  "version": "6.3.0-gamma.1+26.3",
   "name": "WorldPreview",
   "description": "Shows a preview of the world while it is generating. Ported to Minecraft 26.3 by the Chinese 1.16.2+ speedrunning community.",
   "authors": [

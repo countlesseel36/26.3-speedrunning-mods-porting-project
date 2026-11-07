@@ -43,6 +43,7 @@ public final class QueueEntry {
    public final long seed;
    public final String folder;
    public volatile State state = State.CREATED;
+   private volatile boolean deleteAfterPrepare;
    public volatile LevelStorageSource.LevelStorageAccess access;
    public volatile PackRepository packs;
    public volatile WorldStem stem;
@@ -190,6 +191,12 @@ public final class QueueEntry {
          state = State.FAILED;
          error = t.toString();
          SeedQueue.LOGGER.error("[seedqueue] failed to prepare entry #{}", number, t);
+      }
+
+      if (this.deleteAfterPrepare) {
+         this.deleteAfterPrepare = false;
+         SeedQueue.LOGGER.info("[seedqueue] deleting folder of discarded entry #{} after prepare", number);
+         this.deleteWorldFolder();
       }
    }
 
@@ -884,7 +891,12 @@ public final class QueueEntry {
       State previous = state;
       state = State.DISCARDED;
 
-      if (this.externalPreview != null && this.externalPreview.level != null) {
+      // A world that is still being prepared keeps writing into its folder (level.dat); deleting it
+      // right now made the prepare thread fail with NoSuchFileException, so let prepare() clean up.
+      boolean deferDeletion = previous == State.PREPARING;
+      this.deleteAfterPrepare = deferDeletion;
+
+      if (!SeedQueue.shuttingDown && this.externalPreview != null && this.externalPreview.level != null) {
          // The Sodium section manager cached for this preview level is destroyed on the render thread.
          SodiumLevelCache.evictLater(this.externalPreview.level);
       }
@@ -945,6 +957,15 @@ public final class QueueEntry {
          SeedQueue.LOGGER.warn("[seedqueue] failed to close access #{}", number, t);
       }
 
+      if (deferDeletion) {
+         SeedQueue.LOGGER.info("[seedqueue] entry #{} is still preparing, folder deletion deferred", number);
+         return;
+      }
+
+      this.deleteWorldFolder();
+   }
+
+   private void deleteWorldFolder() {
       try {
          if (worldDirectory != null
             && worldDirectory.isAbsolute()

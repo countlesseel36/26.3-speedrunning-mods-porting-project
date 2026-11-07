@@ -1051,8 +1051,15 @@ public final class WorldPreview {
 
       try {
          if (grabTarget == null) {
+            // Honour the simulated preview size here as well: this target is the one the wall cards are
+            // blitted from, and at full window resolution it dominated VRAM use (and caused GPU OOM).
+            int simulatedWidth = Integer.getInteger("worldpreview.simulatedWidth", 0);
+            int simulatedHeight = Integer.getInteger("worldpreview.simulatedHeight", 0);
             grabTarget = createTarget(
-               minecraft, "seedqueue grab", minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight()
+               minecraft,
+               "seedqueue grab",
+               simulatedWidth > 0 ? simulatedWidth : minecraft.getWindow().getWidth(),
+               simulatedHeight > 0 ? simulatedHeight : minecraft.getWindow().getHeight()
             );
          }
 

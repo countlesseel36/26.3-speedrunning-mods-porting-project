@@ -21,7 +21,7 @@ public class MinecraftServerMixin {
       at = @At(value = "INVOKE", target = "Lnet/minecraft/server/players/PlayerList;saveAll()V")
    )
    private void fastreset$skipPlayerSave(PlayerList playerList) {
-      if (FastReset.saveOnQuit) {
+      if (!FastReset.skipSavesNow) {
          playerList.saveAll();
       }
    }
@@ -31,7 +31,7 @@ public class MinecraftServerMixin {
       at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;saveAllChunks(ZZZ)Z")
    )
    private boolean fastreset$skipChunkSave(MinecraftServer server, boolean silent, boolean flush, boolean force) {
-      return FastReset.saveOnQuit && server.saveAllChunks(silent, flush, force);
+      return !FastReset.skipSavesNow && server.saveAllChunks(silent, flush, force);
    }
 
    @Redirect(
@@ -39,6 +39,6 @@ public class MinecraftServerMixin {
       at = @At(value = "INVOKE", target = "Ljava/util/stream/Stream;anyMatch(Ljava/util/function/Predicate;)Z")
    )
    private boolean fastreset$skipChunkWait(Stream<ServerLevel> stream, Predicate<? super ServerLevel> predicate) {
-      return FastReset.saveOnQuit && stream.anyMatch(predicate);
+      return !FastReset.skipSavesNow && stream.anyMatch(predicate);
    }
 }

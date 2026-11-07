@@ -15,14 +15,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MinecraftServerSaveMixin {
    @Inject(method = "saveAllChunks(ZZZ)Z", at = @At("HEAD"), cancellable = true)
    private void fastreset$skipAllChunks(boolean silent, boolean flush, boolean force, CallbackInfoReturnable<Boolean> cir) {
-      if (!FastReset.saveOnQuit) {
+      // Only the quit-to-title button skips saves; shutdown hooks and crashes still write the world.
+      if (FastReset.skipSavesNow) {
          cir.setReturnValue(true);
       }
    }
 
    @Inject(method = "saveEverything(ZZZ)Z", at = @At("HEAD"), cancellable = true)
    private void fastreset$skipEverything(boolean silent, boolean flush, boolean force, CallbackInfoReturnable<Boolean> cir) {
-      if (!FastReset.saveOnQuit) {
+      if (FastReset.skipSavesNow) {
          cir.setReturnValue(true);
       }
    }
