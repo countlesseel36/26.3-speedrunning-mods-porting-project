@@ -7,7 +7,7 @@
 
 | 文件 / File | 版本 / Version |
 | --- | --- |
-| `0.9.0-gamma.28+26.3-SeedQueue.jar` | 0.9.0-gamma.28 |
+| `0.9.0-gamma.29+26.3-SeedQueue.jar` | 0.9.0-gamma.29 |
 | `6.3.0-gamma.1+26.3-WorldPreview.jar` | 6.3.0-gamma.1 |
 | `2.1.0-gamma.1+26.3-Speedrun-API.jar` | 2.1.0-gamma.1 |
 | `2.3.0-gamma.1+26.3-StandardSettings.jar` | 2.3.0-gamma.1 |
@@ -76,6 +76,8 @@
 
 - 修复退出游戏时崩溃/挂起（退出过程跳过 GPU 清理并显式停止后台服务端）
   / Fixed the crash/hang on exit (GPU cleanup is skipped while closing and background servers are stopped explicitly)
+- 修复多次死亡后逐渐卡顿：清理无 manager 支撑的废弃预览世界，避免 `ClientLevel` 泄漏
+  / Fixed the gradual stutter after repeated deaths: orphaned preview levels are swept instead of leaking `ClientLevel`s
 - 修复配置页 NPE 闪退与语言文件损坏导致回退英文
   / Fixed config-screen NPE crashes and a corrupted language file that caused an English fallback
 
