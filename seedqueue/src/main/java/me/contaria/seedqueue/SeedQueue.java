@@ -2043,6 +2043,7 @@ public final class SeedQueue implements ClientModInitializer {
                }
 
                SodiumLevelCache.evictAllExcept(minecraft.level);
+            SodiumLevelCache.sweep();
             } catch (Throwable t) {
                LOGGER.warn("[seedqueue] failed to release previews after a level change", t);
             }

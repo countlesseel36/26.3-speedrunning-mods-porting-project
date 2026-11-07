@@ -168,6 +168,21 @@ public final class SodiumLevelCache {
       }
    }
 
+   /**
+    * Drops preview levels that are no longer backed by a cached manager.
+    *
+    * <p>`markPreview` adds every preview level to a set, but only levels that ever got a manager are
+    * queued for eviction. Levels that were marked and then dropped stayed referenced forever, so after a
+    * long session (many respawns, many previews) the client accumulated dead `ClientLevel`s and the
+    * resulting GC pressure showed up as stutter.</p>
+    */
+   public static void sweep() {
+      ClientLevel current = net.minecraft.client.Minecraft.getInstance().level;
+      PREVIEW_LEVELS.removeIf(level -> level != current
+         && !MANAGERS.containsKey(level)
+         && !PENDING_EVICT.contains(level));
+   }
+
    public static void setThreadLimit(int limit) {
       THREAD_LIMIT.set(limit);
    }

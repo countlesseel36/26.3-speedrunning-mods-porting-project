@@ -79,3 +79,4 @@ Copy-Item "dist\past-build\SeedQueue\0.9.0-gamma.27+26.3-SeedQueue.jar" $mods -F
 | 2026-11-07 | WorldPreview | `6.3.0-gamma.1+26.3` | 开发代号切换为 gamma（内容同 beta.46） | `dist/` |
 | 2026-11-07 | Atum | `1.4.0-gamma.1+26.3` | 开发代号切换为 gamma（内容同 beta.7） | `dist/` |
 | 2026-11-07 | FastReset | `1.6.0-gamma.1+26.3` | 开发代号切换为 gamma（内容同 beta.4） | `dist/` |
+| 2026-11-07 | SeedQueue | `0.9.0-gamma.29+26.3` | 修复多次死亡后的卡顿：清理 `PREVIEW_LEVELS` 中无 manager 的废弃 `ClientLevel`（换世界时 sweep） | `dist/` |
