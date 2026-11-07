@@ -7,7 +7,7 @@
 
 | 文件 / File | 版本 / Version |
 | --- | --- |
-| `0.9.0-gamma.29+26.3-SeedQueue.jar` | 0.9.0-gamma.29 |
+| `0.9.0-gamma.40+26.3-SeedQueue.jar` | 0.9.0-gamma.40 |
 | `6.3.0-gamma.1+26.3-WorldPreview.jar` | 6.3.0-gamma.1 |
 | `2.1.0-gamma.1+26.3-Speedrun-API.jar` | 2.1.0-gamma.1 |
 | `2.3.0-gamma.1+26.3-StandardSettings.jar` | 2.3.0-gamma.1 |
@@ -78,6 +78,11 @@
   / Fixed the crash/hang on exit (GPU cleanup is skipped while closing and background servers are stopped explicitly)
 - 修复多次死亡后逐渐卡顿：清理无 manager 支撑的废弃预览世界，避免 `ClientLevel` 泄漏
   / Fixed the gradual stutter after repeated deaths: orphaned preview levels are swept instead of leaking `ClientLevel`s
+- 出生点恢复原版行为：不再把 `respawn_radius` 设成 0，死亡重生随机分布；首次进入仍与卡片预览一致（传送对齐）
+  / Vanilla respawn behaviour restored: `respawn_radius` is no longer forced to 0, so deaths respawn randomly, while
+  the first join still matches the card (aligned by teleport)
+- 退出更快：关闭窗口后 watchdog 由 12 秒缩短到 4 秒（`-Dseedqueue.exitWatchdogMs` 可调）
+  / Faster exit: the watchdog now halts 4s after shutdown instead of 12s (`-Dseedqueue.exitWatchdogMs`)
 - 修复配置页 NPE 闪退与语言文件损坏导致回退英文
   / Fixed config-screen NPE crashes and a corrupted language file that caused an English fallback
 

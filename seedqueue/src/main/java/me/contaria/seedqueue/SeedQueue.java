@@ -347,14 +347,40 @@ public final class SeedQueue implements ClientModInitializer {
          return;
       }
 
+      long timeoutMs = Math.max(1000L, Long.getLong("seedqueue.exitWatchdogMs", 4000L));
+
       Thread watchdog = new Thread(() -> {
          try {
-            Thread.sleep(12000L);
+            Thread.sleep(timeoutMs);
          } catch (InterruptedException ignored) {
             return;
          }
 
-         LOGGER.warn("[seedqueue] the client is still running 12s after shutdown, halting the JVM");
+         // Diagnose the hang: list the non-daemon threads that keep the JVM alive.
+         try {
+            for (java.util.Map.Entry<Thread, StackTraceElement[]> entry
+                  : Thread.getAllStackTraces().entrySet()) {
+               Thread thread = entry.getKey();
+
+               if (thread.isDaemon() || !thread.isAlive()) {
+                  continue;
+               }
+
+               LOGGER.warn("[seedqueue] still alive: {} ({})", thread.getName(), thread.getState());
+
+               // Top frames tell which library created the pool that keeps the JVM alive.
+               StackTraceElement[] stack = entry.getValue();
+
+               for (int frame = 0; frame < Math.min(18, stack.length); frame++) {
+                  LOGGER.warn("[seedqueue]   at {}", stack[frame]);
+               }
+            }
+         } catch (Throwable ignored) {
+         }
+
+         LOGGER.warn(
+            "[seedqueue] the client is still running {}ms after shutdown, halting the JVM", timeoutMs
+         );
          Runtime.getRuntime().halt(0);
       }, "SeedQueue exit watchdog");
       watchdog.setDaemon(true);
@@ -1894,6 +1920,29 @@ public final class SeedQueue implements ClientModInitializer {
          LOGGER.info("[seedqueue] hand-off complete after {} ticks (preview released)", handoffTicks);
          PreviewState.handoffPreviewEntry = null;
          joinInProgress = false;
+         restoreRespawnRadius(minecraft);
+      }
+   }
+
+   /**
+    * Restores the vanilla respawn radius once the player is in the world.
+    *
+    * <p>Queue worlds pin {@code respawn_radius} to 0 so the preview can predict the join position
+    * (with a larger radius vanilla picks a random spot around the spawn, which no preview can match).
+    * Leaving it at 0 made every death respawn on the exact same block, so the radius is restored to the
+    * vanilla default as soon as the hand-over finished.</p>
+    */
+   private static void restoreRespawnRadius(Minecraft minecraft) {
+      try {
+         var server = minecraft.getSingleplayerServer();
+
+         if (server != null) {
+            server.getGameRules().set(
+               net.minecraft.world.level.gamerules.GameRules.RESPAWN_RADIUS, 10, server
+            );
+         }
+      } catch (Throwable t) {
+         LOGGER.warn("[seedqueue] failed to restore the respawn radius", t);
       }
    }
 
@@ -2030,6 +2079,38 @@ public final class SeedQueue implements ClientModInitializer {
       if (minecraft.level != lastPauseLevel) {
          lastPauseLevel = minecraft.level;
 
+         // The player is teleported onto the previewed spawn here, before any preview state is
+         // released: the previous join path never reached the hand-off alignment code, so the first
+         // position after joining could differ from what the card showed.
+         if (spawnAlignPos != null && minecraft.player != null) {
+            try {
+               // Teleport the *server* player: a ClientLevel cannot be a teleport target, and the client
+               // position is synchronised from the server anyway.
+               var server = minecraft.getSingleplayerServer();
+               var serverPlayer = server == null ? null
+                  : server.getPlayerList().getPlayer(minecraft.player.getUUID());
+
+               if (serverPlayer != null) {
+                  serverPlayer.teleportTo(
+                     server.overworld(),
+                     spawnAlignPos.getX() + 0.5,
+                     spawnAlignPos.getY(),
+                     spawnAlignPos.getZ() + 0.5,
+                     java.util.Collections.emptySet(),
+                     serverPlayer.getYRot(),
+                     serverPlayer.getXRot(),
+                     false
+                  );
+                  LOGGER.info("[seedqueue] aligned player to previewed spawn {}", spawnAlignPos);
+               }
+            } catch (Throwable t) {
+               LOGGER.warn("[seedqueue] previewed spawn alignment failed", t);
+            }
+
+            spawnAlignPos = null;
+            spawnAlignEntry = null;
+         }
+
          // Leaving a world *to the wall* also changes the level; the wall must refill immediately, so the
          // pause only applies when the client is actually rebuilding a level it is going to render.
          if (!joinInProgress && !(minecraft.gui.screen() instanceof WallScreen)) {
@@ -2086,6 +2167,8 @@ public final class SeedQueue implements ClientModInitializer {
             // title/loading screens from flashing in between.
             me.voidxwalker.worldpreview.WorldPreview.rebindRealLevel(minecraft);
       PreviewState.renderDistance = -1;
+            alignPlayerToPreviewedSpawn(spawnAlignEntry, minecraft);
+            spawnAlignEntry = null;
             suppressLoadingScreens = false;
             suppressTicks = 0;
             joinInProgress = false;
@@ -3312,6 +3395,11 @@ public final class SeedQueue implements ClientModInitializer {
       return playEntry(next);
    }
 
+   /** Entry the player just joined from the wall; used to align the player with the previewed spawn. */
+   private static QueueEntry spawnAlignEntry;
+   /** Spawn position of the preview the player joined from; survives the preview being released. */
+   private static net.minecraft.core.BlockPos spawnAlignPos;
+
    public static boolean playEntry(QueueEntry entry) {
       if (entry == null || entry.transferred) {
          return false;
@@ -3336,6 +3424,13 @@ public final class SeedQueue implements ClientModInitializer {
       }
 
       Minecraft minecraft = Minecraft.getInstance();
+
+      if (entry.externalPreview != null) {
+         // Cache the position itself: the preview object is gone by the time the client owns the world.
+         spawnAlignEntry = entry;
+         spawnAlignPos = entry.externalPreview.spawn;
+      }
+
 
       // The wall draws the preview of a ready instance, but the preview itself is built a moment later.
       // Joining in between handed the client a level without a preview and left the title screen drawn

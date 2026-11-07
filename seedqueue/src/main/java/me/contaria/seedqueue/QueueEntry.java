@@ -627,17 +627,6 @@ public final class QueueEntry {
             var level = server.overworld();
             var chunkSource = level.getChunkSource();
 
-            // Vanilla picks the join position with PlayerSpawnFinder, which randomises the candidate
-            // when respawn_radius > 0 - the preview could never match that. With radius 0 there is a
-            // single candidate (the spawn column), which the preview reproduces exactly.
-            try {
-               server.getGameRules().set(
-                  net.minecraft.world.level.gamerules.GameRules.RESPAWN_RADIUS, 0, server
-               );
-            } catch (Throwable t) {
-               SeedQueue.LOGGER.warn("[seedqueue] failed to pin respawn radius", t);
-            }
-
             var spawnPos = level.getRespawnData().pos();
             int spawnX = spawnPos.getX() >> 4;
             int spawnZ = spawnPos.getZ() >> 4;

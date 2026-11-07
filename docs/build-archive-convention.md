@@ -80,3 +80,8 @@ Copy-Item "dist\past-build\SeedQueue\0.9.0-gamma.27+26.3-SeedQueue.jar" $mods -F
 | 2026-11-07 | Atum | `1.4.0-gamma.1+26.3` | 开发代号切换为 gamma（内容同 beta.7） | `dist/` |
 | 2026-11-07 | FastReset | `1.6.0-gamma.1+26.3` | 开发代号切换为 gamma（内容同 beta.4） | `dist/` |
 | 2026-11-07 | SeedQueue | `0.9.0-gamma.29+26.3` | 修复多次死亡后的卡顿：清理 `PREVIEW_LEVELS` 中无 manager 的废弃 `ClientLevel`（换世界时 sweep） | `dist/` |
+| 2026-11-07 | SeedQueue | `0.9.0-gamma.30`–`gamma.34` | 退出线程诊断、出生点对齐的多次尝试（期间发现对齐未执行/传送类型错误） | `dist/past-build/SeedQueue/` |
+| 2026-11-07 | SeedQueue | `0.9.0-gamma.35`–`gamma.36` | 对齐改为缓存 BlockPos，摆脱预览对象已释放的问题 | `dist/past-build/SeedQueue/` |
+| 2026-11-07 | SeedQueue | `0.9.0-gamma.37` | 传送服务端玩家（修正 ClientLevel→ServerLevel 强转），对齐生效 | `dist/past-build/SeedQueue/` |
+| 2026-11-07 | SeedQueue | `0.9.0-gamma.38`–`gamma.39` | 退出挂起诊断：打印非守护线程与 18 帧栈 | `dist/past-build/SeedQueue/` |
+| 2026-11-07 | SeedQueue | `0.9.0-gamma.40+26.3` | watchdog 12s→4s（`-Dseedqueue.exitWatchdogMs`）；当前构建 | `dist/` |
