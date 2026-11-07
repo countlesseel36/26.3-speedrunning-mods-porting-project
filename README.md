@@ -6,8 +6,8 @@
 
 > 这是测试版本、vibe coding 的产物，可能出现重大 bug。/ Test builds and products of vibe coding; expect bugs.
 
-将 1.16.2+ 速通常用的 6 个 Fabric mod 移植到 Minecraft 26.3（Fabric Loader 0.19.5+，JDK 25）。
-/ Ports of six 1.16.2+ speedrunning Fabric mods to Minecraft 26.3 (Fabric Loader 0.19.5+, JDK 25).
+将 1.16.1 速通常用的 6 个 Fabric mod 移植到 Minecraft 26.3（Fabric Loader 0.19.5+，JDK 25）。
+/ Ports of six 1.16.1 speedrunning Fabric mods to Minecraft 26.3 (Fabric Loader 0.19.5+, JDK 25).
 
 ## 包含的模组 / Included mods
 
