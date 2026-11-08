@@ -26,8 +26,6 @@ public final class QueueConfig {
    public static boolean useWall = true;
    public static boolean autoQueue = true;
    public static boolean showHud = true;
-   /** Preview camera perspective: "first_person" or "third_person". */
-   public static String perspective = "first_person";
    /** Wall grid, mirroring the 1.21.4 rows/columns options. */
    public static int rows = 1;
    public static int columns = 3;
@@ -111,12 +109,11 @@ public final class QueueConfig {
       // existing configs pick up the smaller 1280x720 preview targets.
       int storedWidth = clamp(json.has("simulatedWidth") ? json.get("simulatedWidth").getAsInt() : 0, 0, 16384);
       int storedHeight = clamp(json.has("simulatedHeight") ? json.get("simulatedHeight").getAsInt() : 0, 0, 16384);
-      simulatedWidth = storedWidth;
-      simulatedHeight = storedHeight;
+      simulatedWidth = 0;
+      simulatedHeight = 0;
          useWall = !json.has("useWall") || json.get("useWall").getAsBoolean();
          autoQueue = !json.has("autoQueue") || json.get("autoQueue").getAsBoolean();
          showHud = !json.has("showHud") || json.get("showHud").getAsBoolean();
-         perspective = json.has("perspective") ? json.get("perspective").getAsString() : perspective;
          rows = clamp(json.has("rows") ? json.get("rows").getAsInt() : rows, 1, 4);
          columns = clamp(json.has("columns") ? json.get("columns").getAsInt() : columns, 1, 4);
          resetCooldownMs = clamp(json.has("resetCooldownMs") ? json.get("resetCooldownMs").getAsInt() : resetCooldownMs, 0, 5000);
@@ -193,9 +190,6 @@ public final class QueueConfig {
          chunkMapFreezing = json.has("chunkMapFreezing") ? json.get("chunkMapFreezing").getAsLong() : chunkMapFreezing;
          checkMinMemory = !json.has("checkMinMemory") || json.get("checkMinMemory").getAsBoolean();
          WallKeybindings.load(json.has("keyBindings") ? json.getAsJsonObject("keyBindings") : null);
-         if (!"third_person".equals(perspective)) {
-            perspective = "first_person";
-         }
 
          // The wall can only show rows * columns cards at once; keep the queue within that budget.
          queueSize = Math.min(queueSize, rows * columns);
@@ -215,7 +209,6 @@ public final class QueueConfig {
          json.addProperty("useWall", useWall);
          json.addProperty("autoQueue", autoQueue);
          json.addProperty("showHud", showHud);
-         json.addProperty("perspective", perspective);
          json.addProperty("rows", rows);
          json.addProperty("columns", columns);
          json.addProperty("resetCooldownMs", resetCooldownMs);

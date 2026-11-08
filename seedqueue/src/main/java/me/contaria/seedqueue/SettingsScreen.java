@@ -76,9 +76,6 @@ public final class SettingsScreen extends Screen {
       this.option(x, y, "Wall: " + (QueueConfig.useWall ? "on" : "off"), () -> QueueConfig.useWall = !QueueConfig.useWall);
       this.option(right, y, "Auto queue: " + (QueueConfig.autoQueue ? "on" : "off"), () -> QueueConfig.autoQueue = !QueueConfig.autoQueue);
       y += 26;
-      this.option(x, y, "Preview: " + perspectiveLabel(), () -> {
-         QueueConfig.perspective = "third_person".equals(QueueConfig.perspective) ? "first_person" : "third_person";
-      });
       this.option(right, y, "Delete worlds: " + (QueueConfig.deleteDiscardedWorlds ? "on" : "off"), () -> {
          QueueConfig.deleteDiscardedWorlds = !QueueConfig.deleteDiscardedWorlds;
       });
@@ -98,9 +95,6 @@ public final class SettingsScreen extends Screen {
       }).bounds(x, y, 150, 20).build());
    }
 
-   private static String perspectiveLabel() {
-      return "third_person".equals(QueueConfig.perspective) ? "Third person" : "First person";
-   }
 
    @Override
    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {

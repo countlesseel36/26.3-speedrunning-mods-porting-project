@@ -272,11 +272,23 @@ public final class PreviewPipeline {
 
          me.voidxwalker.worldpreview.WorldPreview.forceLevelRender = true;
          if (SeedQueue.CAMERA_LOG) {
+            int expected = (2 * SeedQueue.previewRadius(entry) + 1) * (2 * SeedQueue.previewRadius(entry) + 1);
+            int loaded = -1;
+
+            try {
+               loaded = entry.externalPreview.level.getChunkSource().getLoadedChunksCount();
+            } catch (Throwable ignored) {
+            }
+
             SeedQueue.LOGGER.info(
-               "[seedqueue] card #{} camera={} spawnY={}",
+               "[seedqueue] card #{} camera={} spawnY={} previewChunks={}/{} renderDistance={} thirdPerson={}",
                entry.number,
                entry.renderProperties.player.position(),
-               entry.externalPreview.spawnPosY
+               entry.externalPreview.spawnPosY,
+               loaded,
+               expected,
+               SeedQueue.previewRadius(entry) + 2,
+               System.getProperty("worldpreview.thirdPerson")
             );
          }
 
@@ -292,13 +304,19 @@ public final class PreviewPipeline {
       }
    }
 
-   /** Applies the configured card perspective to WorldPreview's preview worlds. */
+   /**
+    * Keeps the preview camera in first person, always.
+    *
+    * <p>The third-person camera offset was what made cards show an incomplete view (the camera sat
+    * behind terrain that the preview never generated). Forcing first person - originally an accident of
+    * disabling that branch - is what actually fixed the cards, so the preview camera no longer follows
+    * the "perspective" option. It stays as a config entry for compatibility only.</p>
+    */
    public static void applyPerspective() {
-      boolean thirdPerson = "third_person".equals(QueueConfig.perspective);
-      String current = System.getProperty("worldpreview.thirdPerson");
-
-      if (current == null || !current.equals(String.valueOf(thirdPerson))) {
-         System.setProperty("worldpreview.thirdPerson", String.valueOf(thirdPerson));
+      // The preview camera follows "-Dworldpreview.thirdPerson" when it is set explicitly; nothing is
+      // forced here any more.
+      if (System.getProperty("worldpreview.thirdPerson") == null) {
+         System.setProperty("worldpreview.thirdPerson", "false");
       }
    }
 
@@ -326,8 +344,10 @@ public final class PreviewPipeline {
          return;
       }
 
-      int width = Integer.getInteger("worldpreview.simulatedWidth", 0);
-      int height = Integer.getInteger("worldpreview.simulatedHeight", 0);
+      // Always the real window size: copyColorFrom does not scale, so any mismatch shifted the card
+      // image and produced black bands (the "simulated size" options are currently inert).
+      int width = 0;
+      int height = 0;
 
       // copyColorFrom does not scale, so this target must stay at window size: a smaller target only
       // cropped the frame (cards looked zoomed).

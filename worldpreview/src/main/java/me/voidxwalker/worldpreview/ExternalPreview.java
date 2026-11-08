@@ -156,12 +156,12 @@ public final class ExternalPreview {
 
          // Wall previews are always first person: the offset camera looked past the generated chunks
          // and left a black band at the bottom of the cards, whatever the player's perspective was.
-         if (false && Boolean.getBoolean("worldpreview.thirdPerson")) {
+         if (thirdPersonCameraAllowed()) {
             LocalPlayer camera = gameMode.createPlayer(level, null, null, new ItemActivation());
          applyRealSkin(minecraft, camera);
 
             if (camera != null) {
-               camera.setPos(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5 - 3.0);
+               camera.setPos(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5 - thirdPersonCameraDistance());
                camera.setYRot(0.0F);
                camera.setXRot(12.0F);
                camera.setNoGravity(true);
@@ -688,12 +688,12 @@ public final class ExternalPreview {
 
          // Wall previews are always first person: the offset camera looked past the generated chunks
          // and left a black band at the bottom of the cards, whatever the player's perspective was.
-         if (false && Boolean.getBoolean("worldpreview.thirdPerson")) {
+         if (thirdPersonCameraAllowed()) {
             LocalPlayer camera = gameMode.createPlayer(level, null, null, new ItemActivation());
          applyRealSkin(minecraft, camera);
 
             if (camera != null) {
-               camera.setPos(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5 - 3.0);
+               camera.setPos(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5 - thirdPersonCameraDistance());
                camera.setYRot(0.0F);
                camera.setXRot(12.0F);
                camera.setNoGravity(true);
@@ -738,5 +738,22 @@ public final class ExternalPreview {
          WorldPreview.LOGGER.warn("[preview] failed to build external preview", t);
          return null;
       }
+   }
+
+   /**
+    * Third person is only safe while the camera stays inside the generated chunks: the player-to-camera
+    * line has to remain within the loaded radius, otherwise the card shows unloaded space as black.
+    */
+   private static int previewRadiusBlocks() {
+      return Math.max(16, Integer.getInteger("worldpreview.previewRadiusBlocks", 6 * 16));
+   }
+
+   private static boolean thirdPersonCameraAllowed() {
+      return Boolean.getBoolean("worldpreview.thirdPerson") && previewRadiusBlocks() > 48;
+   }
+
+   private static float thirdPersonCameraDistance() {
+      // One block of slack at the loaded edge, and never further back than the vanilla 3 blocks.
+      return Math.min(3.0F, Math.max(0.0F, previewRadiusBlocks() - 17.0F));
    }
 }

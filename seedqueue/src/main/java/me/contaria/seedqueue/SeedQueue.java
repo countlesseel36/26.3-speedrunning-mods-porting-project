@@ -537,7 +537,7 @@ public final class SeedQueue implements ClientModInitializer {
                   entry.externalPreview.spawn,
                   0.0,
                   0.0,
-                  "third_person".equals(QueueConfig.perspective)
+                  false
                );
                entry.nativePreview = image;
                entry.uploadNativePreview();
@@ -1343,7 +1343,7 @@ public final class SeedQueue implements ClientModInitializer {
          minecraft.options.pauseOnLostFocus = false;
          shotCameraSaved = minecraft.options.getCameraType();
          minecraft.options.setCameraType(
-            "third_person".equals(QueueConfig.perspective)
+            false
                ? net.minecraft.client.CameraType.THIRD_PERSON_BACK
                : net.minecraft.client.CameraType.FIRST_PERSON
          );
@@ -1606,7 +1606,7 @@ public final class SeedQueue implements ClientModInitializer {
                entry.externalPreview.spawn,
                0.0,
                0.0,
-               "third_person".equals(QueueConfig.perspective)
+               false
             );
             entry.nativePreview = image;
             entry.uploadNativePreview();
@@ -1656,7 +1656,7 @@ public final class SeedQueue implements ClientModInitializer {
                      entry.externalPreview.spawn,
                      0.0,
                      0.0,
-                     "third_person".equals(QueueConfig.perspective)
+                     false
                   );
                   entry.nativePreview = image;
                   entry.uploadNativePreview();

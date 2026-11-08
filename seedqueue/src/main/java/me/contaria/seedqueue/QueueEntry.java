@@ -703,6 +703,82 @@ public final class QueueEntry {
                }
             }
 
+            // Refill the snapshot while the server is still running (this is the prepare thread, before
+            // park()). A chunk can be skipped when it was already loaded, so the preview level used to
+            // end up with holes (16/25) that rendered as black in the cards.
+            if (Boolean.parseBoolean(System.getProperty("seedqueue.fillMissingChunks", "true"))) {
+               int filled = 0;
+
+               for (int dx = -radius; dx <= radius; dx++) {
+                  for (int dz = -radius; dz <= radius; dz++) {
+                     if (state == State.DISCARDED) {
+                        return;
+                     }
+
+                     int chunkX = spawnX + dx;
+                     int chunkZ = spawnZ + dz;
+
+                     if (hasPacketFor(chunkX, chunkZ)) {
+                        continue;
+                     }
+
+                     // Only the two z edges are ever missing (the generation loop stops one row short):
+                     // force-generating the whole square would be needless work on every instance.
+                     if (Math.abs(dz) != radius) {
+                        continue;
+                     }
+
+                     try {
+                        net.minecraft.world.level.chunk.LevelChunk chunk =
+                           (net.minecraft.world.level.chunk.LevelChunk)chunkSource.getChunk(
+                              chunkX, chunkZ, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, true
+                           );
+
+                        if (chunk == null) {
+                           continue;
+                        }
+
+                        chunkPackets.add(
+                           new net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket(
+                              chunk, level.getLightEngine(), null, null
+                           )
+                        );
+                        filled++;
+                     } catch (Throwable t) {
+                        SeedQueue.LOGGER.warn("[seedqueue] entry #{} failed to snapshot chunk {},{}", number, chunkX, chunkZ, t);
+                     }
+                  }
+               }
+
+               int expected = (2 * radius + 1) * (2 * radius + 1);
+               SeedQueue.LOGGER.info(
+                  "[seedqueue] entry #{} preview packets: {} ({} filled, expected {})",
+                  number, chunkPackets.size(), filled, expected
+               );
+
+               if (chunkPackets.size() < expected) {
+                  StringBuilder missingList = new StringBuilder();
+
+                  for (int dx = -radius; dx <= radius; dx++) {
+                     for (int dz = -radius; dz <= radius; dz++) {
+                        if (hasPacketFor(spawnX + dx, spawnZ + dz)) {
+                           continue;
+                        }
+
+                        if (missingList.length() > 0) {
+                           missingList.append(' ');
+                        }
+
+                        missingList.append(dx).append(',').append(dz);
+                     }
+                  }
+
+                  SeedQueue.LOGGER.warn(
+                     "[seedqueue] entry #{} missing preview chunks (relative): {}", number, missingList
+                  );
+               }
+            }
+
             captureMap(level, spawnX, spawnZ);
             state = State.READY;
             readyAtMillis = System.currentTimeMillis();
@@ -730,6 +806,17 @@ public final class QueueEntry {
             SeedQueue.LOGGER.error("[seedqueue] entry #{} chunk generation failed", number, t);
          }
       });
+   }
+
+   /** True when the snapshot already holds a packet for this chunk position. */
+   private boolean hasPacketFor(int chunkX, int chunkZ) {
+      for (net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket packet : chunkPackets) {
+         if (packet.x() == chunkX && packet.z() == chunkZ) {
+            return true;
+         }
+      }
+
+      return false;
    }
 
    /** Uploads a frame captured from the wall preview as this card's GUI texture. */
