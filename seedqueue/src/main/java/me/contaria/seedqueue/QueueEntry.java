@@ -722,9 +722,10 @@ public final class QueueEntry {
                         continue;
                      }
 
-                     // Only the two z edges are ever missing (the generation loop stops one row short):
-                     // force-generating the whole square would be needless work on every instance.
-                     if (Math.abs(dz) != radius) {
+                     // The generation loop can miss either edge (x or z, depending on which ring it
+                     // stopped in), so only skip the interior: at most 16 edge chunks are forced, and a
+                     // missing edge showed up as a black band in the cards.
+                     if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
                         continue;
                      }
 

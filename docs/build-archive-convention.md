@@ -5,7 +5,7 @@
 
 ```
 dist/
-├─ 0.9.0-gamma.28+26.3-SeedQueue.jar     ← 当前构建
+├─ 0.9.0-rc.28+26.3-SeedQueue.jar     ← 当前构建
 ├─ 2.1.0-beta.45+26.3-Speedrun-API.jar
 ├─ ...
 └─ past-build/
@@ -28,7 +28,7 @@ dist/
 
 ```powershell
 $mods = "D:\prism_launcher\PrismLauncher\instance\26.3 test\minecraft\mods"
-Copy-Item "dist\past-build\SeedQueue\0.9.0-gamma.27+26.3-SeedQueue.jar" $mods -Force
+Copy-Item "dist\past-build\SeedQueue\0.9.0-rc.27+26.3-SeedQueue.jar" $mods -Force
 ```
 
 注意：回退时先把 `mods` 里同模组的其它 jar 删掉，避免出现重复 mod id。
@@ -41,8 +41,8 @@ Copy-Item "dist\past-build\SeedQueue\0.9.0-gamma.27+26.3-SeedQueue.jar" $mods -F
 
 | 情况 | 处理 |
 |---|---|
-| 已有 `gamma.28`、`gamma.29`，回退到 `gamma.28` | `gamma.29` 重命名为 **`gamma.29-old`**，`gamma.28` 不变 |
-| 回退后继续开发 | 新版本号**继续沿用的下一个号**（如 `gamma.30`），不要复用 `gamma.29` |
+| 已有 `rc.28`、`rc.29`，回退到 `rc.28` | `rc.29` 重命名为 **`rc.29-old`**，`rc.28` 不变 |
+| 回退后继续开发 | 新版本号**继续沿用的下一个号**（如 `rc.30`），不要复用 `rc.29` |
 
 改名的对象包括：`dist/` 根目录里被替换下来的 jar、`past-build/<Mod>/` 里对应的历史 jar，以及 `mods` 目录中的旧文件（后者直接删除即可）。
 
@@ -52,9 +52,9 @@ Copy-Item "dist\past-build\SeedQueue\0.9.0-gamma.27+26.3-SeedQueue.jar" $mods -F
 
 | 日期 | 模组 | 版本 | 改动摘要 | 位置 |
 | --- | --- | --- | --- | --- |
-| 2026-11-07 | SeedQueue | `0.9.0-gamma.28+26.3` | 未绑定键位显示「未指定」（原版 `key.keyboard.unknown`），版本号不变 | `dist/` |
-| 2026-11-07 | SeedQueue | `0.9.0-gamma.28-old+26.3` | 同一版本的旧行为（未绑定显示 `?`），用于回退对比 | `dist/past-build/SeedQueue/` |
-| 2026-11-07 | SeedQueue | `0.9.0-gamma.29-old`、`gamma.30-old`、`gamma.31-old` | 被放弃的鼠标绑定实验版本（回退到 gamma.28 后加 `-old`） | `dist/past-build/SeedQueue/` |
+| 2026-11-07 | SeedQueue | `0.9.0-rc.28+26.3` | 未绑定键位显示「未指定」（原版 `key.keyboard.unknown`），版本号不变 | `dist/` |
+| 2026-11-07 | SeedQueue | `0.9.0-rc.28-old+26.3` | 同一版本的旧行为（未绑定显示 `?`），用于回退对比 | `dist/past-build/SeedQueue/` |
+| 2026-11-07 | SeedQueue | `0.9.0-rc.29-old`、`rc.30-old`、`rc.31-old` | 被放弃的鼠标绑定实验版本（回退到 rc.28 后加 `-old`） | `dist/past-build/SeedQueue/` |
 | 2026-11-07 | SpeedrunAPI | `2.1.0-beta.45+26.3` | StandardSettings 键位支持绑定鼠标键（0 基修正） | `dist/` |
 | 2026-11-07 | StandardSettings | `2.3.0-beta.18+26.3` | 进世界重活优化、异步写 standardoptions、toggleAll 逐项容错 | `dist/` |
 | 2026-11-07 | WorldPreview | `6.3.0-beta.46+26.3` | 预览玩家附加真实 PlayerInfo（皮肤实验）、数据包队列上限 | `dist/` |
@@ -67,23 +67,34 @@ Copy-Item "dist\past-build\SeedQueue\0.9.0-gamma.27+26.3-SeedQueue.jar" $mods -F
 
 | 第几次归档 | 文件名示例 |
 | --- | --- |
-| 第 1 次 | `0.9.0-gamma.28+26.3-SeedQueue.jar` |
-| 第 2 次 | `0.9.0-gamma.28-1+26.3-SeedQueue.jar` |
-| 第 3 次 | `0.9.0-gamma.28-2+26.3-SeedQueue.jar` |
+| 第 1 次 | `0.9.0-rc.28+26.3-SeedQueue.jar` |
+| 第 2 次 | `0.9.0-rc.28-1+26.3-SeedQueue.jar` |
+| 第 3 次 | `0.9.0-rc.28-2+26.3-SeedQueue.jar` |
 
 - 序号加在版本号之后、`+26.3` 之前；
-- 已带 `-old` 的构建同样适用：`0.9.0-gamma.28-old-1+26.3-SeedQueue.jar`；
+- 已带 `-old` 的构建同样适用：`0.9.0-rc.28-old-1+26.3-SeedQueue.jar`；
 - 序号从 **1** 开始，按归档时间递增；`dist/` 根目录始终只保留未加序号的最新构建。
-| 2026-11-07 | SpeedrunAPI | `2.1.0-gamma.1+26.3` | 开发代号由 beta 切换为 gamma（内容同 beta.45） | `dist/` |
-| 2026-11-07 | StandardSettings | `2.3.0-gamma.1+26.3` | 开发代号切换为 gamma（内容同 beta.18） | `dist/` |
-| 2026-11-07 | WorldPreview | `6.3.0-gamma.1+26.3` | 开发代号切换为 gamma（内容同 beta.46） | `dist/` |
-| 2026-11-07 | Atum | `1.4.0-gamma.1+26.3` | 开发代号切换为 gamma（内容同 beta.7） | `dist/` |
-| 2026-11-07 | FastReset | `1.6.0-gamma.1+26.3` | 开发代号切换为 gamma（内容同 beta.4） | `dist/` |
-| 2026-11-07 | SeedQueue | `0.9.0-gamma.29+26.3` | 修复多次死亡后的卡顿：清理 `PREVIEW_LEVELS` 中无 manager 的废弃 `ClientLevel`（换世界时 sweep） | `dist/` |
-| 2026-11-07 | SeedQueue | `0.9.0-gamma.30`–`gamma.34` | 退出线程诊断、出生点对齐的多次尝试（期间发现对齐未执行/传送类型错误） | `dist/past-build/SeedQueue/` |
-| 2026-11-07 | SeedQueue | `0.9.0-gamma.35`–`gamma.36` | 对齐改为缓存 BlockPos，摆脱预览对象已释放的问题 | `dist/past-build/SeedQueue/` |
-| 2026-11-07 | SeedQueue | `0.9.0-gamma.37` | 传送服务端玩家（修正 ClientLevel→ServerLevel 强转），对齐生效 | `dist/past-build/SeedQueue/` |
-| 2026-11-07 | SeedQueue | `0.9.0-gamma.38`–`gamma.39` | 退出挂起诊断：打印非守护线程与 18 帧栈 | `dist/past-build/SeedQueue/` |
-| 2026-11-07 | SeedQueue | `0.9.0-gamma.40+26.3` | watchdog 12s→4s（`-Dseedqueue.exitWatchdogMs`）；当前构建 | `dist/` |
-| 2026-11-08 | SeedQueue | `0.9.0-gamma.55+26.3` | 队列/跑分上限、警告文案、分类标题本地化；v0.2.1 发布构建 | `dist/` |
-| 2026-11-08 | SpeedrunAPI | `2.1.0-gamma.4+26.3` | 全局开关置顶、分类标题翻译；v0.2.1 发布构建 | `dist/` |
+| 2026-11-07 | SpeedrunAPI | `2.1.0-rc.1+26.3` | 开发代号由 beta 切换为 rc（内容同 beta.45） | `dist/` |
+| 2026-11-07 | StandardSettings | `2.3.0-rc.1+26.3` | 开发代号切换为 rc（内容同 beta.18） | `dist/` |
+| 2026-11-07 | WorldPreview | `6.3.0-rc.1+26.3` | 开发代号切换为 rc（内容同 beta.46） | `dist/` |
+| 2026-11-07 | Atum | `1.4.0-rc.1+26.3` | 开发代号切换为 rc（内容同 beta.7） | `dist/` |
+| 2026-11-07 | FastReset | `1.6.0-rc.1+26.3` | 开发代号切换为 rc（内容同 beta.4） | `dist/` |
+| 2026-11-07 | SeedQueue | `0.9.0-rc.29+26.3` | 修复多次死亡后的卡顿：清理 `PREVIEW_LEVELS` 中无 manager 的废弃 `ClientLevel`（换世界时 sweep） | `dist/` |
+| 2026-11-07 | SeedQueue | `0.9.0-rc.30`–`rc.34` | 退出线程诊断、出生点对齐的多次尝试（期间发现对齐未执行/传送类型错误） | `dist/past-build/SeedQueue/` |
+| 2026-11-07 | SeedQueue | `0.9.0-rc.35`–`rc.36` | 对齐改为缓存 BlockPos，摆脱预览对象已释放的问题 | `dist/past-build/SeedQueue/` |
+| 2026-11-07 | SeedQueue | `0.9.0-rc.37` | 传送服务端玩家（修正 ClientLevel→ServerLevel 强转），对齐生效 | `dist/past-build/SeedQueue/` |
+| 2026-11-07 | SeedQueue | `0.9.0-rc.38`–`rc.39` | 退出挂起诊断：打印非守护线程与 18 帧栈 | `dist/past-build/SeedQueue/` |
+| 2026-11-07 | SeedQueue | `0.9.0-rc.40+26.3` | watchdog 12s→4s（`-Dseedqueue.exitWatchdogMs`）；当前构建 | `dist/` |
+| 2026-11-08 | SeedQueue | `0.9.0-rc.55+26.3` | 队列/跑分上限、警告文案、分类标题本地化；v0.2.1 发布构建 | `dist/` |
+| 2026-11-08 | SpeedrunAPI | `2.1.0-rc.4+26.3` | 全局开关置顶、分类标题翻译；v0.2.1 发布构建 | `dist/` |
+| 2026-11-09 | SeedQueue | `0.9.0-rc.79-disabled-benchmark.1+26.3` | 跑分功能暂时禁用（按键/选项保留 + 红色警告）；配置页顶部新增显存警告并自动换行 | `dist/` |
+| 2026-11-09 | SpeedrunAPI | `2.1.0-rc.6-disabled-benchmark.1+26.3` | 顶部警告自动换行（word wrap），列表几何不变 | `dist/` |
+
+## 版本号格式（rc 阶段）
+
+- 带禁用功能标记：`<主版本>-rc.<序号>-disabled-benchmark.<N>+26.3`
+- 其他模组：`<主版本>-rc.1-build.1+26.3`
+
+当前统一为 rc.1 / build.1；后续功能改动再推进编号。
+| 2026-11-09 | SeedQueue | `0.9.0-rc.1-disabled-benchmark.2+26.3` | 外圈四边强制补区块（压测 189/189、后续 225/225 通过） | `dist/` |
+| 2026-11-09 | SeedQueue | `0.9.0-rc.1-disabled-benchmark.3+26.3` | 退出修复：watchdog 提前启动 + 后台清理；v0.3.0 发布构建 | `dist/` |

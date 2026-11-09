@@ -42,7 +42,7 @@
   "seedqueue.key.resetLastLock": "Reset Last Lock",
   "seedqueue.key.scheduleJoin": "Schedule Instance",
   "seedqueue.key.scheduleAll": "Schedule All",
-  "seedqueue.key.startBenchmark": "Start Benchmark",
+  "seedqueue.key.startBenchmark": "Start Benchmark\n§c⚠ Benchmarking is disabled in this build because of an unresolved bug (the key and option are kept as placeholders).",
   "seedqueue.key.cancelBenchmark": "Stop Benchmark",
   "seedqueue.key.quitWall": "Quit Wall Screen",
   "speedrunapi.config.seedqueue.category.queue": "Queue Settings",
@@ -130,7 +130,7 @@
   "speedrunapi.config.seedqueue.option.showDebugMenu": "Show Debug Menu",
   "speedrunapi.config.seedqueue.option.showDebugMenu.description": "Renders an FPS Graph and a Profiler on top of the Wall Screen.\n搂cUse this only for debugging, any runs played with this option enabled will be invalidated!",
   "speedrunapi.config.seedqueue.option.benchmarkResets": "Benchmark Resets",
-  "speedrunapi.config.seedqueue.option.benchmarkResets.description": "The default amount of resets done when starting a benchmark.\nYou can start a benchmark using the \"Start Benchmark\" keybind and cancel it before it reaches the configured amount of resets using the \"Stop Benchmark\" keybind.",
+  "speedrunapi.config.seedqueue.option.benchmarkResets.description": "The default amount of resets done when starting a benchmark.\nYou can start a benchmark using the \"Start Benchmark\" keybind and cancel it before it reaches the configured amount of resets using the \"Stop Benchmark\" keybind.\n§c⚠ Benchmarking is disabled in this build because of an unresolved bug (the key and option are kept as placeholders).",
   "speedrunapi.config.seedqueue.option.showChunkMaps": "Chunkmap Overlay",
   "speedrunapi.config.seedqueue.option.showChunkMaps.description": "Renders an overlay with all the chunkmaps of currently generating seeds.",
   "speedrunapi.config.seedqueue.option.checkMinMemory": "Check Allocated Memory",
@@ -179,5 +179,6 @@
   "speedrunapi.config.seedqueue.option.keyBindings.description": "Key bindings used on the wall (edited in the keybindings screen).",
   "speedrunapi.config.seedqueue.option.showChunkProgress": "Chunk Progress",
   "speedrunapi.config.seedqueue.option.showChunkProgress.description": "Show the generated/total chunk counter on the cards. Hidden by default.",
-  "seedqueue.key.backToWall": "Return to wall"
+  "seedqueue.key.backToWall": "Return to wall",
+  "speedrunapi.config.seedqueue.vramWarning": "⚠ VRAM warning: every queued instance owns a render target and VRAM. Keep the queue at 6 or fewer, and lower it further on 1440p/4K displays."
 }

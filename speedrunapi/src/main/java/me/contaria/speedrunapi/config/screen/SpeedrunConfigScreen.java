@@ -582,6 +582,19 @@ public class SpeedrunConfigScreen extends Screen {
       }
 
       // Clip the option labels to the list area so nothing bleeds into the title or the button band.
+      if ("seedqueue".equals(this.modID)) {
+         // Memory warning pinned to the top of the SeedQueue page, wrapped to the list width so it
+         // never runs off the screen (it used to be a single overlong line).
+         String warning = net.minecraft.locale.Language.getInstance().getOrDefault("speedrunapi.config.seedqueue.vramWarning");
+         java.util.List<String> lines = wrapText(warning, this.width - 40);
+         int y = 8;
+
+         for (String line : lines) {
+            graphics.text(this.font, line, this.width / 2 - this.font.width(line) / 2, y, 0xFFFF5555);
+            y += this.font.lineHeight + 1;
+         }
+      }
+
       graphics.enableScissor(0, 36, this.width, this.height - 40);
 
       try {
@@ -590,6 +603,29 @@ public class SpeedrunConfigScreen extends Screen {
          // Scissor state must never leak into the widgets drawn afterwards.
          graphics.disableScissor();
       }
+   }
+
+   /** Splits a message into lines of at most {@code maxWidth} pixels. */
+   private java.util.List<String> wrapText(String text, int maxWidth) {
+      java.util.List<String> lines = new java.util.ArrayList<>();
+      StringBuilder current = new StringBuilder();
+
+      for (String word : text.split(" ")) {
+         String candidate = current.length() == 0 ? word : current + " " + word;
+
+         if (this.font.width(candidate) > maxWidth && current.length() > 0) {
+            lines.add(current.toString());
+            current = new StringBuilder(word);
+         } else {
+            current = new StringBuilder(candidate);
+         }
+      }
+
+      if (current.length() > 0) {
+         lines.add(current.toString());
+      }
+
+      return lines;
    }
 
    /** Draws the clipped option labels; called inside an enableScissor/disableScissor pair. */

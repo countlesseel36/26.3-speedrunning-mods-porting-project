@@ -309,6 +309,11 @@ public final class SeedQueue implements ClientModInitializer {
    public static volatile boolean shuttingDown;
 
    public static void shutdown() {
+      // Arm the watchdog *first*: halting hundreds of queued servers can take far longer than 4s, and
+      // while this loop runs the old code had not started the watchdog yet, so the window froze with
+      // no way out (the "large batch of seeds then exit hangs" report).
+      startExitWatchdog();
+
       shuttingDown = true;
       for (QueueEntry entry : new ArrayList<>(ENTRIES)) {
          // Wake and halt the background server first: its thread is not a daemon, so a parked server
@@ -1032,8 +1037,11 @@ public final class SeedQueue implements ClientModInitializer {
             if (entry.state == QueueEntry.State.READY && !entry.locked) {
                ENTRIES.remove(entry);
 
+               // Deliberately no PreviewState.unbind() here: unbinding during a benchmark removed the
+               // only thing rendering behind the overlay (black screen). The next frame simply binds
+               // another entry.
                if (PreviewState.frameSwapEntry == entry) {
-                  PreviewState.unbind();
+                  PreviewState.frameSwapEntry = null;
                }
 
                discardAsync(entry);
@@ -1041,7 +1049,14 @@ public final class SeedQueue implements ClientModInitializer {
                   benchmarkStarted = System.currentTimeMillis();
                }
                benchmarkCount++;
-               if (--refillCooldown <= 0) {
+               // The benchmark consumes READY entries and refills the queue; that loop normally runs from the
+      // wall update, which stops as soon as the benchmark overlay closes the wall. Drive it from the
+      // tick instead so a benchmark keeps making progress outside the wall screen.
+      if (benchmarking && !(minecraft.gui.screen() instanceof WallScreen)) {
+         wallScheduledTick(minecraft);
+      }
+
+      if (--refillCooldown <= 0) {
          refillCooldown = Math.max(1, Integer.getInteger("seedqueue.refillIntervalTicks", 10));
          refillQueue(minecraft);
       }
@@ -1168,6 +1183,14 @@ public final class SeedQueue implements ClientModInitializer {
       joinInProgress = false;
       joinedFromWall = false;
       wallShown = false;
+
+      // Leaving the wall frees every preview level's Sodium managers: their arenas stay referenced
+      // otherwise and a later 256 MiB shared-arena allocation fails with GpuOutOfMemoryException.
+      try {
+         SodiumLevelCache.evictAllExcept(net.minecraft.client.Minecraft.getInstance().level);
+         SodiumLevelCache.sweep();
+      } catch (Throwable ignored) {
+      }
       PreviewState.unbind();
 
       try {
@@ -1256,9 +1279,24 @@ public final class SeedQueue implements ClientModInitializer {
          wallSavedCameraType = null;
       }
 
+      // A benchmark closes the wall to show its own overlay; closing the wall must not cancel the run
+      // (it used to: "benchmark cancelled after 4 resets" happened right after onWallClosed).
+      if (benchmarking) {
+         LOGGER.info("[seedqueue] onWallClosed ignored while benchmarking");
+         return;
+      }
+
       LOGGER.info("[seedqueue] onWallClosed");
       joinInProgress = false;
       wallShown = false;
+
+      // Leaving the wall frees every preview level's Sodium managers: their arenas stay referenced
+      // otherwise and a later 256 MiB shared-arena allocation fails with GpuOutOfMemoryException.
+      try {
+         SodiumLevelCache.evictAllExcept(net.minecraft.client.Minecraft.getInstance().level);
+         SodiumLevelCache.sweep();
+      } catch (Throwable ignored) {
+      }
       cancelScheduledJoin();
       benchmarking = false;
       benchmarkFinishedAt = 0;
@@ -3207,11 +3245,87 @@ public final class SeedQueue implements ClientModInitializer {
    }
 
    /** Refills the queue after a wall reset/delete, mirroring the 1.21.4 refillAfterReset. */
+   /** Number of entries whose server is currently parked (holding a full server + worlds). */
+   /** True when at least one unlocked instance is READY and can be consumed by the benchmark. */
+   public static boolean hasReadyUnlockedEntry() {
+      for (QueueEntry entry : ENTRIES) {
+         if (entry.state == QueueEntry.State.READY && !entry.locked && !entry.transferred) {
+            return true;
+         }
+      }
+
+      return false;
+   }
+
+   public static int parkedCount() {
+      int count = 0;
+
+      for (QueueEntry entry : ENTRIES) {
+         if (entry.parked) {
+            count++;
+         }
+      }
+
+      return count;
+   }
+
+   /**
+    * Hard cap on parked servers: every parked entry keeps a whole integrated server in memory, so the
+    * number of them must never exceed the configured queue size. The oldest ones are halted and
+    * discarded instead of being left alive forever (that is what ran the client out of memory).
+    */
+   private static void enforceParkedLimit() {
+      int limit = Math.max(1, queueSize());
+      int parked = parkedCount();
+
+      if (parked <= limit) {
+         return;
+      }
+
+      java.util.List<QueueEntry> candidates = new java.util.ArrayList<>();
+
+      for (QueueEntry entry : ENTRIES) {
+         if (entry.parked) {
+            candidates.add(entry);
+         }
+      }
+
+      candidates.sort(java.util.Comparator.comparingLong(entry -> entry.readyAtMillis));
+
+      for (QueueEntry entry : candidates) {
+         if (parked <= limit) {
+            break;
+         }
+
+         LOGGER.warn(
+            "[seedqueue] parked servers {} > queue size {}, discarding entry #{}",
+            parked, limit, entry.number
+         );
+         ENTRIES.remove(entry);
+         entry.discard();
+         parked--;
+      }
+   }
+
    public static void refillQueue(Minecraft minecraft) {
 
       // While the player is actually playing in a world the queue stays frozen; it refills when the
       // wall is shown again. Generating in the background only costs frames here.
-      if (minecraft.level != null && minecraft.player != null && !wallShown) {
+      // The benchmark runs inside a world and still needs the queue to refill, so it is exempt.
+      if (minecraft.level != null && minecraft.player != null && !wallShown && !benchmarking) {
+         return;
+      }
+
+      enforceParkedLimit();
+
+      int parkedNow = parkedCount();
+      int threshold = Math.max(1, Integer.getInteger("seedqueue.maxParkedServers", 8));
+
+      if (parkedNow >= threshold && !benchmarking) {
+         LOGGER.warn(
+            "[seedqueue] {} parked servers reached the threshold ({}), pausing refill to protect memory",
+            parkedNow, threshold
+         );
          return;
       }
 
@@ -3457,9 +3571,21 @@ public final class SeedQueue implements ClientModInitializer {
       suppressLoadingScreens = true;
       LOGGER.info("[seedqueue] joining queued entry #{} (seed {})", entry.number, entry.seed);
 
+      // Unpark before handing the server to the client: a server that is still parked never ticks, so
+      // the world would stay limited to the preview chunks (no chunks load beyond them).
+      entry.select();
+
       if (entry.play(minecraft)) {
          joinedFromWall = true;
          wallShown = false;
+
+      // Leaving the wall frees every preview level's Sodium managers: their arenas stay referenced
+      // otherwise and a later 256 MiB shared-arena allocation fails with GpuOutOfMemoryException.
+      try {
+         SodiumLevelCache.evictAllExcept(net.minecraft.client.Minecraft.getInstance().level);
+         SodiumLevelCache.sweep();
+      } catch (Throwable ignored) {
+      }
 
          if (QueueConfig.joinTransition) {
             WallScreen.beginJoinTransition();

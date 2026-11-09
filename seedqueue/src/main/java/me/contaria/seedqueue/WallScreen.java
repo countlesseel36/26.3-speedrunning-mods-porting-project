@@ -152,15 +152,12 @@ public final class WallScreen extends Screen {
                SeedQueue.scheduleAll();
                return true;
             case START_BENCHMARK:
-               SeedQueue.benchmarking = true;
-               SeedQueue.benchmarkCount = 0;
-               SeedQueue.benchmarkStarted = System.currentTimeMillis();
-               SeedQueue.playSound("start_benchmark");
-               SeedQueue.LOGGER.info(
-                  "[seedqueue] benchmark started ({} resets)",
-                  Integer.getInteger("seedqueue.benchmarkResets", QueueConfig.benchmarkResets)
-               );
+               // Disabled for now: the benchmark never reached a usable state (it kept cancelling and
+               // measured generation time instead of reset time). The key and the option stay in the
+               // config screen with a warning.
+               SeedQueue.LOGGER.warn("[seedqueue] benchmark is disabled in this build");
                return true;
+
             case CANCEL_BENCHMARK:
                SeedQueue.benchmarking = false;
                SeedQueue.playSound("finish_benchmark");
