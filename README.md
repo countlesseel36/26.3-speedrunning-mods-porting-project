@@ -2,7 +2,7 @@
 
 ## 警告 / WARNING
 
-**WARNING（警告）** — 这些模组由中国 1.16.2+ 速通社区自行移植，**未获 speedrun.com 官方承认**；使用它们完成的速通记录**无法通过 speedrun.com 审核**。它们是 vibe coding 的产物、属于测试版本：可能存在重大 bug，并可能影响你的速通成绩。请自行权衡后再使用。 / These mods are unofficial ports made by the Chinese 1.16.2+ speedrunning community and are not officially recognized by speedrun.com. Runs made with them will not pass speedrun.com verification. They are products of vibe coding and test builds: major bugs may exist and may affect your runs. Weigh the trade-offs before using them.
+**WARNING** — 这些模组由中国 1.16.2+ 速通社区自行移植，**未获 speedrun.com 官方承认**；使用它们完成的速通记录**无法通过 speedrun.com 审核**。它们是 vibe coding 的产物、属于测试版本：可能存在重大 bug，并可能影响你的速通成绩。请自行权衡后再使用。 / These mods are unofficial ports made by the Chinese 1.16.2+ speedrunning community and are not officially recognized by speedrun.com. Runs made with them will not pass speedrun.com verification. They are products of vibe coding and test builds: major bugs may exist and may affect your runs. Weigh the trade-offs before using them.
 
 **WARNING（显存 / VRAM）** — 队列中的每个实例都会占用一个渲染目标与显存。队列数量不要超过 6；在 2K/4K 窗口下请进一步降低，否则有爆显存（GpuOutOfMemoryException）导致游戏崩溃的风险。
 / Every queued instance owns a render target and VRAM. Keep the queue at 6 or fewer, and lower it further on 1440p/4K displays — otherwise the game may crash with a GPU out-of-memory error.
