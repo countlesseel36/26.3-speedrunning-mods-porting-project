@@ -98,3 +98,4 @@ Copy-Item "dist\past-build\SeedQueue\0.9.0-rc.27+26.3-SeedQueue.jar" $mods -Forc
 当前统一为 rc.1 / build.1；后续功能改动再推进编号。
 | 2026-11-09 | SeedQueue | `0.9.0-rc.1-disabled-benchmark.2+26.3` | 外圈四边强制补区块（压测 189/189、后续 225/225 通过） | `dist/` |
 | 2026-11-09 | SeedQueue | `0.9.0-rc.1-disabled-benchmark.3+26.3` | 退出修复：watchdog 提前启动 + 后台清理；v0.3.0 发布构建 | `dist/` |
+| 2026-11-10 | SeedQueue | `0.9.0-rc.2-disabled-benchmark.1+26.3` | 显存泄漏重大修复（渲染目标释放 + 渲染线程销毁）；暂停界面 F6 回墙；v0.3.1 发布构建 | `dist/` |

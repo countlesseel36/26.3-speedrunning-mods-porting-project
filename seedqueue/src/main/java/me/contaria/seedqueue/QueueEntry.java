@@ -809,6 +809,35 @@ public final class QueueEntry {
       });
    }
 
+   /**
+    * Frees a render target on the client thread.
+    *
+    * <p>{@code discard()} can run on the prepare thread, and {@code RenderSystem} throws
+    * "Rendersystem called from wrong thread" there - which is why the previous attempt leaked anyway:
+    * the destroy call failed 244 times and the buffers stayed alive.</p>
+    */
+   private void destroyTarget(com.mojang.blaze3d.pipeline.RenderTarget target, String label) {
+      if (target == null) {
+         return;
+      }
+
+      Runnable closer = () -> {
+         try {
+            target.destroyBuffers();
+         } catch (Throwable t) {
+            SeedQueue.LOGGER.warn("[seedqueue] failed to destroy the {} target of #{}", label, number, t);
+         }
+      };
+
+      net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+
+      if (minecraft != null && !minecraft.isSameThread()) {
+         minecraft.execute(closer);
+      } else {
+         closer.run();
+      }
+   }
+
    /** True when the snapshot already holds a packet for this chunk position. */
    private boolean hasPacketFor(int chunkX, int chunkZ) {
       for (net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket packet : chunkPackets) {
@@ -1010,6 +1039,16 @@ public final class QueueEntry {
 
          previewTexture = null;
       }
+
+      // Each entry owned a window-sized render target that was never freed on discard: after a few
+      // hundred resets the GPU ran out of memory ("Could not allocate buffer of 268435456").
+      destroyTarget(displayTarget, "display");
+      displayTarget = null;
+
+      // Same leak as displayTarget: the preview render target is a window-sized GPU buffer that was
+      // never freed, so a long session exhausted VRAM.
+      destroyTarget(renderTarget, "preview");
+      renderTarget = null;
 
       if (nativePreview != null) {
          try {

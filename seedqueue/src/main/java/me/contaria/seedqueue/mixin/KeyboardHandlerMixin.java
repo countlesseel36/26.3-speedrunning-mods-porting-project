@@ -23,9 +23,15 @@ public class KeyboardHandlerMixin {
    private void seedqueue$backToWallKey(long window, int key, KeyEvent event, CallbackInfo ci) {
       Minecraft client = Minecraft.getInstance();
 
-      // Only while playing: with a screen open the press belongs to that screen. Without this check a
-      // key press in the wall key binding screen triggered the wall return instead of binding the key.
-      if (client.gui.screen() != null || client.level == null) {
+      if (client.level == null) {
+         return;
+      }
+
+      // The wall key must also work from the in-game pause screen (F6 there did nothing). Any other
+      // screen keeps the press for itself: in the wall key binding screen it has to bind, not join.
+      net.minecraft.client.gui.screens.Screen screen = client.gui.screen();
+
+      if (screen != null && !(screen instanceof net.minecraft.client.gui.screens.PauseScreen)) {
          return;
       }
 
@@ -36,6 +42,10 @@ public class KeyboardHandlerMixin {
       }
 
       if (SeedQueue.returnToWallFromJoinedWorld(client)) {
+         if (screen != null) {
+            client.gui.setScreen(null);
+         }
+
          ci.cancel();
       }
    }

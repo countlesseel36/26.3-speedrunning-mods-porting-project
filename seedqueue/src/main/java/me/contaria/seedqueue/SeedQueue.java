@@ -1056,6 +1056,7 @@ public final class SeedQueue implements ClientModInitializer {
          wallScheduledTick(minecraft);
       }
 
+
       if (--refillCooldown <= 0) {
          refillCooldown = Math.max(1, Integer.getInteger("seedqueue.refillIntervalTicks", 10));
          refillQueue(minecraft);
@@ -1110,6 +1111,10 @@ public final class SeedQueue implements ClientModInitializer {
     *
     * @return true when the key press was handled
     */
+   /** Set while a wall return is waiting for the client to finish leaving the world. */
+   private static boolean pendingWallReturn;
+   private static int wallReturnTicks;
+
    public static boolean returnToWallFromJoinedWorld(Minecraft minecraft) {
       // "Playing in a world" means: this session joined a queued world from the wall and has not
       // left it yet. Everything else (title screen, wall, loading, preview levels bound to
@@ -1152,8 +1157,12 @@ public final class SeedQueue implements ClientModInitializer {
       wallShown = true;
       wallTicks = 0;
 
+      // Hand the wall itself to disconnect(): passing a TitleScreen let vanilla put the title back
+      // over the wall afterwards, which is why F6 from the F3+Esc pause ended up at the title screen.
+      WallScreen wallScreen = new WallScreen(() -> ENTRIES);
+
       try {
-         minecraft.disconnect(new TitleScreen(), false);
+         minecraft.disconnect(wallScreen, false);
       } catch (Throwable t) {
          LOGGER.warn("[seedqueue] disconnect while returning to the wall failed", t);
 
@@ -1164,7 +1173,11 @@ public final class SeedQueue implements ClientModInitializer {
          }
       }
 
-      minecraft.setScreenAndShow(new WallScreen(() -> ENTRIES));
+      // Set it immediately (the normal pause return relies on this), and keep a pending flag so the
+      // tick can put the wall back if vanilla's disconnect completion replaced it.
+      minecraft.setScreenAndShow(wallScreen);
+      pendingWallReturn = true;
+      wallReturnTicks = 0;
       return true;
    }
 
@@ -2116,6 +2129,20 @@ public final class SeedQueue implements ClientModInitializer {
 
    public static void tick(Minecraft minecraft) {
       SodiumLevelCache.processPending();
+
+      // Re-assert the wall after a return: vanilla's disconnect completion sets the title screen on a
+      // later tick and used to swallow it (F6 from the F3+Esc pause ended on the title screen).
+      if (pendingWallReturn && minecraft.level == null) {
+         if (minecraft.gui.screen() instanceof WallScreen) {
+            pendingWallReturn = false;
+         } else if (++wallReturnTicks >= 1) {
+            pendingWallReturn = false;
+            wallShown = true;
+            wallTicks = 0;
+            LOGGER.info("[seedqueue] reopening the wall after the disconnect finished");
+            minecraft.setScreenAndShow(new WallScreen(() -> ENTRIES));
+         }
+      }
 
       // Respawning replaces the client level. Rebuilding every preview while the client rebuilds the
       // world itself caused a multi-second frame drop, so pause the rotation for a moment.
