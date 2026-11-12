@@ -12,11 +12,11 @@
 
 | 文件 / File | 版本 / Version |
 | --- | --- |
-| `0.9.0-rc.2-disabled-benchmark.16+26.3-SeedQueue.jar` | 0.9.0-rc.2-disabled-benchmark.16 |
+| `0.9.0-rc.3-disabled-benchmark.1+26.3-SeedQueue.jar` | 0.9.0-rc.3-disabled-benchmark.1 |
 | `6.3.0-rc.1-build.1+26.3-WorldPreview.jar` | 6.3.0-rc.1-build.1 |
-| `2.1.0-rc.1-disabled-benchmark.23+26.3-Speedrun-API.jar` | 2.1.0-rc.1-disabled-benchmark.23 |
-| `2.3.0-rc.1-build.6+26.3-StandardSettings.jar` | 2.3.0-rc.1-build.6 |
-| `1.4.0-rc.1-build.2+26.3-Atum.jar` | 1.4.0-rc.1-build.2 |
+| `2.1.0-rc.2-disabled-benchmark.1+26.3-Speedrun-API.jar` | 2.1.0-rc.2-disabled-benchmark.1 |
+| `2.3.0-rc.2-build.1+26.3-StandardSettings.jar` | 2.3.0-rc.2-build.1 |
+| `1.4.0-rc.2-build.1+26.3-Atum.jar` | 1.4.0-rc.2-build.1 |
 | `1.6.0-rc.1-build.1+26.3-FastReset.jar` | 1.6.0-rc.1-build.1 |
 
 ## 更新内容（相对 v0.3.1）/ Changes since v0.3.1
@@ -47,6 +47,11 @@
 - Atum 在 SeedQueue 存在时禁用金靴子的单实例重开（Shift+左键仍可打开设置）；
 - F6 可从暂停界面（含 F3+Esc 暂停）返回墙界面。
   / Atum's single-instance reset is disabled while SeedQueue is installed (Shift+click still opens settings); F6 returns to the wall from the pause screen.
+
+## 致谢 / Credits
+
+感谢 **ttkuilei** 的实测与问题反馈——本版多数修复（改键持久化、鼠标绑定、配置页分组/顺序、显存泄漏与掉线）都由其测试报告定位。
+/ Thanks to **ttkuilei** for the testing and reports behind most of these fixes.
 
 ## 已知问题 / Known issues
 

@@ -14,10 +14,10 @@
 
 | 模组 / Mod | 版本 / Version | 说明 / Description |
 | --- | --- | --- |
-| SeedQueue | `0.9.0-rc.2-disabled-benchmark.166+26.3` | 后台生成世界 + 墙界面预览 / Background world generation + wall previews |
+| SeedQueue | `0.9.0-rc.3-disabled-benchmark.16+26.3` | 后台生成世界 + 墙界面预览 / Background world generation + wall previews |
 | WorldPreview | `6.3.0-rc.1-build.1+26.3` | 预览渲染管线 / Preview rendering pipeline |
-| SpeedrunAPI | `2.1.0-rc.1-disabled-benchmark.23+26.3` | 配置界面框架 / Config screen framework |
-| StandardSettings | `2.3.0-rc.1-build.6+26.3` | 进世界应用预设选项 / Applies preset options on world join |
+| SpeedrunAPI | `2.1.0-rc.2-disabled-benchmark.1+26.3` | 配置界面框架 / Config screen framework |
+| StandardSettings | `2.3.0-rc.2-build.1+26.3` | 进世界应用预设选项 / Applies preset options on world join |
 | Atum | `1.4.0-rc.1-build.1+26.3` | 自动重置 / Auto reset |
 | FastReset | `1.6.0-rc.1-build.1+26.3` | 秒退到标题 / Instant quit to title |
 
@@ -108,6 +108,11 @@ powershell -File .\build.ps1 -Mod all
 
 产物在 `dist/`，历史构建在 `dist/past-build/<Mod>/`（规则见 `docs/build-archive-convention.md`）。
 / Artifacts go to `dist/`; older builds are kept in `dist/past-build/<Mod>/` (see `docs/build-archive-convention.md`).
+
+## 致谢 / Credits
+
+- 感谢 **ttkuilei** 的实测与反馈：改键持久化、鼠标绑定失效、配置页分组与顺序、显存泄漏与掉线等问题均来自其测试报告。
+  / Thanks to **ttkuilei** for testing and reporting: the key persistence, broken mouse bindings, config grouping/ordering, VRAM leak and disconnect issues all came from their reports.
 
 ## 说明 / Notes
 
