@@ -42,34 +42,19 @@
 
 ## 性能优化（压力测试）/ Performance & stress test
 
-### 跑分结果（开发机实测）/ Benchmark results (developer PC)
+### 跑分结果 / Benchmark results
 
-开发机：**RTX 4060 Laptop 8 GB / i9-12900HX (16C24T) / 32 GB DDR5-4800**，窗口 2560×1440，`maxWorldGenerationPercentage = 40`。
+开发机 / Developer PC：**RTX 4060 Laptop 8 GB / i9-12900HX (16C24T) / 32 GB DDR5-4800**，窗口 2560×1440，`maxWorldGenerationPercentage = 40`。
 
-| 并发 | 重置次数 | 总耗时 | RPS | 稳态 build | 进程 CPU | 整机 CPU | 堆峰值 |
+| 并发 / Concurrency | 重置 / Resets | 总耗时 / Time | RPS | 单实例构建 / Build | 进程 CPU | 整机 CPU | 堆峰值 / Heap |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 4（默认队列容量） | 61 | 27.1 s | **2.25** | 1.66 s | 55–61% | 60–70% | 1.9 GB |
-| 8（跑分并发，超出容量） | 61 | 24.0 s | **2.54** | 2.7–3.2 s | 74–78% | 81–85% | 2.4 GB |
+| 4（默认 / default） | 61 | 27.1 s | **2.25** | 1.66 s | 55–61% | 60–70% | 1.9 GB |
+| 8（跑分 / benchmark） | 61 | 24.0 s | **2.54** | 2.7–3.2 s | 74–78% | 81–85% | 2.4 GB |
 
-单实例构建耗时构成（子阶段计时）：`server` 0.2–1.1 s、`gen` 1.1–2.2 s（占 60–75%）、`capture` 0.15–0.4 s。
+构建耗时构成 / build breakdown：`server` 0.2–1.1 s、`gen` 1.1–2.2 s（60–75%）、`capture` 0.15–0.4 s。
 
-结论：并发翻倍仅 +13%，单实例反而变慢，说明瓶颈是资源争抢而非线程池；后台执行器线程数为 `clamp(核数-1, 1, 255)`，本机 23，远高于并发数。显存约 110–140 MB/实例，8 GB 显卡在并发 16 时约 2 GB，不会爆显存。
-
-在 2K 窗口、队列容量 6 的设置下，用脚本化 smoke 流程连续重置约 **1200 个实例**：
-
-- **225/225** 次预览区块补齐完整（`preview packets: 25 (9 filled, expected 25)`），无缺块；
-- **0** 次 `GpuOutOfMemoryException`、**0** 次未捕获异常；
-- 实例就绪耗时约 **500–650 ms**，峰值约 1600 ms；
-- 关闭窗口后 **4 秒内**进程结束，无长时间无响应。
-
-/ With a 2K window and queue size 6, a scripted smoke run reset about **1200 instances**: all 225 sampled previews filled completely, no GPU out-of-memory errors and no uncaught exceptions; instances became ready in ~500–650 ms (peak 1600 ms) and the process exited within 4 seconds.
-
-建议的 JVM 参数 / Suggested JVM flags:
-
-```
--Xms4G -Xmx4G -XX:+UseG1GC -XX:MaxGCPauseMillis=30 -XX:+ParallelRefProcEnabled
-```
-
+并发翻倍仅 +13%，单实例反而变慢 → 瓶颈是资源争抢，不是线程池；显存约 110–140 MB/实例，8 GB 显卡在并发 16 时约 2 GB，不会爆显存，故已移除所有显存警告。
+/ Doubling concurrency only gains 13% while per-instance build time grows: contention, not the thread pool. VRAM is ~110–140 MB per instance, so 16 instances need ~2 GB of 8 GB — VRAM warnings were removed.
 ## 已知问题 / Known issues
 
 1. 未修复：第三人称下玩家皮肤消失
@@ -78,21 +63,6 @@
    / Not fixed: the far distance is still black
 3. 未修复：实例偶尔出现地形闪烁
    / Not fixed: queued instances occasionally show terrain flickering
-4. 跑分功能有重大 bug，已暂时停用（按键与选项保留并附警告）
-   / Benchmarking has a major bug and is disabled for now (the key and option remain, with a warning)
-
-## 跑分（Benchmark）
-
-按 **B** 开始、**N / Esc** 取消，结果 15 秒后自动消失；跑分期间允许超出队列容量并行构建。
-
-开发机实测（RTX 4060 Laptop 8 GB / i9-12900HX / 32 GB DDR5-4800）：
-
-| 并发 | RPS | 单实例构建 | 进程 CPU | 整机 CPU | 堆峰值 |
-| --- | --- | --- | --- | --- | --- |
-| 4 | 2.25 | 1.66 s | 55–61% | 60–70% | 1.9 GB |
-| 8 | 2.54 | 2.7–3.2 s | 74–78% | 81–85% | 2.4 GB |
-
-并发翻倍仅 +13%，单实例反而变慢 → 瓶颈是资源争抢，不是线程池；显存约 110–140 MB/实例，不会爆，故已移除所有显存警告。
 
 ## 开发技术难点 / Engineering challenges
 
