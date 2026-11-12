@@ -4,8 +4,6 @@
 
 **WARNING（警告）** — 这些模组由中国 1.16.2+ 速通社区自行移植，**未获 speedrun.com 官方承认**；使用它们完成的速通记录**无法通过 speedrun.com 审核**。它们是 vibe coding 的产物、属于测试版本：可能存在重大 bug，并可能影响你的速通成绩。请自行权衡后再使用。 / These mods are unofficial ports made by the Chinese 1.16.2+ speedrunning community and are not officially recognized by speedrun.com. Runs made with them will not pass speedrun.com verification. They are products of vibe coding and test builds: major bugs may exist and may affect your runs. Weigh the trade-offs before using them.
 
-**WARNING（显存 / VRAM）** — 队列中的每个实例都会占用一个渲染目标与显存。队列数量不要超过 6；在 2K/4K 窗口下请进一步降低，否则有爆显存（GpuOutOfMemoryException）导致游戏崩溃的风险。
-/ Every queued instance owns a render target and VRAM. Keep the queue at 6 or fewer, and lower it further on 1440p/4K displays — otherwise the game may crash with a GPU out-of-memory error.
 
 **WARNING（窗口分辨率 / Window resolution）** — 卡片预览按当前窗口分辨率渲染。运行中修改窗口大小或使用与预览尺寸不匹配的分辨率，可能出现黑边或画面错位；建议固定窗口尺寸后再开墙。
 / Card previews are rendered at the current window resolution. Resizing the window while a preview is shown, or using a resolution that does not match, can produce black edges or a shifted image — set the window size before opening the wall.
@@ -15,11 +13,11 @@
 | 模组 / Mod | 版本 / Version | 说明 / Description |
 | --- | --- | --- |
 | SeedQueue | `0.9.0-rc.3-disabled-benchmark.16+26.3` | 后台生成世界 + 墙界面预览 / Background world generation + wall previews |
-| WorldPreview | `6.3.0-rc.1-build.1+26.3` | 预览渲染管线 / Preview rendering pipeline |
-| SpeedrunAPI | `2.1.0-rc.2-disabled-benchmark.1+26.3` | 配置界面框架 / Config screen framework |
-| StandardSettings | `2.3.0-rc.2-build.1+26.3` | 进世界应用预设选项 / Applies preset options on world join |
+| WorldPreview | `6.3.0-rc.1+26.3` | 预览渲染管线 / Preview rendering pipeline |
+| SpeedrunAPI | `2.1.0-rc.3+26.3` | 配置界面框架 / Config screen framework |
+| StandardSettings | `2.3.0-rc.2+26.3` | 进世界应用预设选项 / Applies preset options on world join |
 | Atum | `1.4.0-rc.1-build.1+26.3` | 自动重置 / Auto reset |
-| FastReset | `1.6.0-rc.1-build.1+26.3` | 秒退到标题 / Instant quit to title |
+| FastReset | `1.6.0-rc.1+26.3` | 秒退到标题 / Instant quit to title |
 
 可选 / Optional: `SeedQueue-LockedPool.zip`（锁定池资源包 / locked-pool resource pack）
 
@@ -69,6 +67,19 @@
    / Not fixed: queued instances occasionally show terrain flickering
 4. 跑分功能有重大 bug，已暂时停用（按键与选项保留并附警告）
    / Benchmarking has a major bug and is disabled for now (the key and option remain, with a warning)
+
+## 跑分（Benchmark）
+
+按 **B** 开始、**N / Esc** 取消，结果 15 秒后自动消失；跑分期间允许超出队列容量并行构建。
+
+开发机实测（RTX 4060 Laptop 8 GB / i9-12900HX / 32 GB DDR5-4800）：
+
+| 并发 | RPS | 单实例构建 | 进程 CPU | 整机 CPU | 堆峰值 |
+| --- | --- | --- | --- | --- | --- |
+| 4 | 2.25 | 1.66 s | 55–61% | 60–70% | 1.9 GB |
+| 8 | 2.54 | 2.7–3.2 s | 74–78% | 81–85% | 2.4 GB |
+
+并发翻倍仅 +13%，单实例反而变慢 → 瓶颈是资源争抢，不是线程池；显存约 110–140 MB/实例，不会爆，故已移除所有显存警告。
 
 ## 开发技术难点 / Engineering challenges
 

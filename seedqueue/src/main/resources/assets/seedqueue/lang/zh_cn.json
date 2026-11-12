@@ -32,7 +32,7 @@
   "seedqueue.key.playNextLock": "进入下个锁定实例",
   "seedqueue.key.scheduleJoin": "计划实例",
   "seedqueue.key.scheduleAll": "计划所有",
-  "seedqueue.key.startBenchmark": "§c警告：跑分功能因未修复的重大 bug 已停用（按键与选项仅作占位）。",
+  "seedqueue.key.startBenchmark": "开始跑分",
   "seedqueue.key.cancelBenchmark": "结束跑分",
   "speedrunapi.config.seedqueue.category.queue": "队列选项",
   "speedrunapi.config.seedqueue.option.chunkRadius": "区块半径",
@@ -44,7 +44,7 @@
   "speedrunapi.config.seedqueue.category.experimental": "实验选项",
   "speedrunapi.config.seedqueue.category.debug": "调试选项",
   "speedrunapi.config.seedqueue.option.maxCapacity": "种子队列上限",
-  "speedrunapi.config.seedqueue.option.maxCapacity.description": "队列保留的实例数量（上限 10）。\n§c警告：超过 6 个有爆显存（GpuOutOfMemoryException）风险。",
+  "speedrunapi.config.seedqueue.option.maxCapacity.description": "队列保留的实例数量（上限 10）。",
   "speedrunapi.config.seedqueue.option.maxConcurrently": "种子加载上限",
   "speedrunapi.config.seedqueue.option.maxConcurrently.description": "可以同时生成的最大种子数。",
   "speedrunapi.config.seedqueue.option.maxConcurrently_onWall": "种子加载上限（墙界面）",
@@ -111,8 +111,8 @@
   "speedrunapi.config.seedqueue.option.useWatchdog.description": "启动一个额外的线程, 每10秒打印一次主线程堆栈跟踪, 以诊断冻结问题。",
   "speedrunapi.config.seedqueue.option.showDebugMenu": "显示调试菜单",
   "speedrunapi.config.seedqueue.option.showDebugMenu.description": "在墙界面上显示 FPS 图形和分析器。\n仅用于调试, 启用此选项时完成任何的记录都将无法过审！",
-  "speedrunapi.config.seedqueue.option.benchmarkResets": "跑分重置",
-  "speedrunapi.config.seedqueue.option.benchmarkResets.description": "§c警告：跑分功能因未修复的重大 bug 已停用（按键与选项仅作占位）。",
+  "speedrunapi.config.seedqueue.option.benchmarkResets": "跑分重置次数",
+  "speedrunapi.config.seedqueue.option.benchmarkResets.description": "跑分执行的重置次数（1–1000）。跑分期间按 B 开始、N 或 Esc 结束。",
   "speedrunapi.config.seedqueue.option.showChunkMaps": "SeedQueue 区块加载",
   "speedrunapi.config.seedqueue.option.showChunkMaps.description": "显示当前正在加载的种子的区块加载进度",
   "seedqueue.wall": "SeedQueue · 实时世界预览",
@@ -158,6 +158,5 @@
   "speedrunapi.config.seedqueue.option.smartSwitch": "智能切换",
   "speedrunapi.config.seedqueue.option.soundVolume": "音量",
   "speedrunapi.config.seedqueue.option.checkMinMemory": "检查最低内存",
-  "seedqueue.key.backToWall": "返回墙界面",
-  "speedrunapi.config.seedqueue.vramWarning": "§c警告：队列中的每个实例都会占用渲染目标与显存，请勿超过 6 个（2K/4K 窗口下更低）。"
+  "seedqueue.key.backToWall": "返回墙界面"
 }

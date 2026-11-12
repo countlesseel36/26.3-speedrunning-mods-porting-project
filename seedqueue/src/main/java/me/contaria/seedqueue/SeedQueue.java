@@ -584,12 +584,16 @@ public final class SeedQueue implements ClientModInitializer {
             entry.renderTarget = me.voidxwalker.worldpreview.WorldPreview.createTarget(
                minecraft, "seedqueue card " + entry.number, minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight()
             );
+
+            
          }
 
          if (entry.displayTarget == null) {
             entry.displayTarget = me.voidxwalker.worldpreview.WorldPreview.createTarget(
                minecraft, "seedqueue display " + entry.number, minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight()
             );
+
+            
          }
 
          me.voidxwalker.worldpreview.WorldPreview.setTargetOverride(entry.renderTarget);
@@ -761,6 +765,8 @@ public final class SeedQueue implements ClientModInitializer {
                   minecraft, "seedqueue instance " + entry.number,
                   minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight()
                );
+
+               
             }
 
             if (Boolean.getBoolean("seedqueue.renderLog") && entry.renderTarget != null) {
@@ -775,6 +781,8 @@ public final class SeedQueue implements ClientModInitializer {
                      minecraft, "seedqueue display " + entry.number,
                      minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight()
                   );
+
+                  
                }
 
                boolean painted = Boolean.getBoolean("seedqueue.paintTest");
@@ -1085,6 +1093,7 @@ public final class SeedQueue implements ClientModInitializer {
 
             if (benchmarkCount >= Integer.getInteger("seedqueue.benchmarkResets", QueueConfig.benchmarkResets)) {
                benchmarking = false;
+               restoreGenerationLimit();
                benchmarkFinishedAt = System.currentTimeMillis();
                benchmarkResultResets = benchmarkCount;
                benchmarkResultMs = Math.max(1L, benchmarkFinishedAt - benchmarkStarted);
@@ -2242,6 +2251,10 @@ public final class SeedQueue implements ClientModInitializer {
          }
       }
 
+      if (benchmarking) {
+         resourceSampleTick(minecraft);
+      }
+
       // 跑分时队列被清空后，补队列逻辑依赖墙的更新流程；这里直接驱动，避免只跑一次就停住
       if (benchmarking && ENTRIES.isEmpty() && refillCooldown > 1) {
          refillCooldown = 0;
@@ -2749,6 +2762,8 @@ public final class SeedQueue implements ClientModInitializer {
                   candidate.renderTarget = me.voidxwalker.worldpreview.WorldPreview.createTarget(
                      minecraft, "seedqueue frame test", minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight()
                   );
+
+                  
                }
 
                if (candidate.renderTarget != null) {
@@ -3377,6 +3392,8 @@ public final class SeedQueue implements ClientModInitializer {
             entry.displayTarget = me.voidxwalker.worldpreview.WorldPreview.createTarget(
                minecraft, "seedqueue card " + entry.number, minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight()
             );
+
+            
          }
 
          me.voidxwalker.worldpreview.WorldPreview.activateExternal(entry.renderProperties);
@@ -3480,6 +3497,11 @@ public final class SeedQueue implements ClientModInitializer {
       int parkedNow = parkedCount();
       int threshold = Math.max(1, Integer.getInteger("seedqueue.maxParkedServers", 8));
 
+      if (benchmarking) {
+         // 跑分并发独立可调，用来测量"同时构建实例数"对显存/内存/CPU 的影响
+         threshold = Math.max(1, Integer.getInteger("seedqueue.benchmarkConcurrency", threshold));
+      }
+
       if (parkedNow >= threshold && !benchmarking) {
          LOGGER.warn(
             "[seedqueue] {} parked servers reached the threshold ({}), pausing refill to protect memory",
@@ -3490,7 +3512,12 @@ public final class SeedQueue implements ClientModInitializer {
 
       long unlocked = ENTRIES.stream().filter(entry -> !entry.locked).count();
 
-      while (unlocked < queueSize()) {
+      // 跑分时需要更多实例并行构建：允许超出队列容量，用 benchmarkConcurrency 作为目标数量
+      int target = benchmarking
+         ? Math.max(queueSize(), Integer.getInteger("seedqueue.benchmarkConcurrency", queueSize()))
+         : queueSize();
+
+      while (unlocked < target) {
          QueueEntry entry = new QueueEntry(nextEntryNumber++, RANDOM.nextLong());
          ENTRIES.add(entry);
          unlocked++;
@@ -3674,6 +3701,48 @@ public final class SeedQueue implements ClientModInitializer {
 
    private static long lastPlayNextLockAt;
 
+   private static int resourceSampleTicks;
+   private static long lastGpuEstimate;
+
+   /** Logs heap / CPU / VRAM while a benchmark runs, so concurrency can be tuned with data. */
+   private static void resourceSampleTick(Minecraft minecraft) {
+      if (++resourceSampleTicks < Integer.getInteger("seedqueue.resourceSampleTicks", 100)) {
+         return;
+      }
+
+      resourceSampleTicks = 0;
+      Runtime runtime = Runtime.getRuntime();
+      long usedHeapMb = (runtime.totalMemory() - runtime.freeMemory()) / (1024L * 1024L);
+      long maxHeapMb = runtime.maxMemory() / (1024L * 1024L);
+      double processCpu = -1.0;
+      double systemCpu = -1.0;
+      long committedMb = -1L;
+
+      try {
+         java.lang.management.OperatingSystemMXBean base = java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+
+         if (base instanceof com.sun.management.OperatingSystemMXBean os) {
+            // getProcessCpuLoad() 在部分 JDK 上返回 0..1，另一些返回 0..100；统一成百分比
+            double pc = os.getProcessCpuLoad();
+            double sc = os.getCpuLoad();
+            processCpu = pc > 1.0 ? pc : pc * 100.0;
+            systemCpu = sc > 1.0 ? sc : sc * 100.0;
+            committedMb = os.getCommittedVirtualMemorySize() / (1024L * 1024L);
+         }
+      } catch (Throwable ignored) {
+      }
+
+      long targetBytes = 0L;
+
+      LOGGER.info(
+         "[seedqueue] bench resources: concurrency={} entries={} heap={}/{}MB committed={}MB cpu={}% sys={}%",
+         Integer.getInteger("seedqueue.benchmarkConcurrency", Integer.getInteger("seedqueue.maxParkedServers", 8)),
+         ENTRIES.size(),
+         usedHeapMb, maxHeapMb, committedMb,
+         String.format("%.1f", processCpu), String.format("%.1f", systemCpu)
+      );
+   }
+
    /** Starts a benchmark run from the wall. */
    public static void startBenchmark() {
       // 跑分进行中再次按 B 只会重启计数，忽略
@@ -3686,10 +3755,37 @@ public final class SeedQueue implements ClientModInitializer {
       benchmarkCount = 0;
       benchmarkStarted = System.currentTimeMillis();
       benchmarkLastResetAt = 0L;
+      applyBenchmarkGenerationLimit();
       LOGGER.info("[seedqueue] benchmark started ({} resets)", Integer.getInteger("seedqueue.benchmarkResets", QueueConfig.benchmarkResets));
    }
 
    private static long benchmarkLastResetAt;
+   /** 跑分期间强制使用的生成百分比；-1 表示当前没有覆盖。 */
+   private static int savedMaxWorldGenerationPercentage = -1;
+
+   /** 跑分期间把 maxWorldGenerationPercentage 固定为 80%，避免半成品实例拖慢重置。 */
+   private static void applyBenchmarkGenerationLimit() {
+      if (savedMaxWorldGenerationPercentage < 0) {
+         savedMaxWorldGenerationPercentage = QueueConfig.maxWorldGenerationPercentage;
+         QueueConfig.maxWorldGenerationPercentage = 80;
+         LOGGER.info(
+            "[seedqueue] benchmark generation limit: {}% -> 80%",
+            savedMaxWorldGenerationPercentage
+         );
+      }
+   }
+
+   /** 跑分结束后恢复玩家设定的百分比。 */
+   private static void restoreGenerationLimit() {
+      if (savedMaxWorldGenerationPercentage >= 0) {
+         QueueConfig.maxWorldGenerationPercentage = savedMaxWorldGenerationPercentage;
+         LOGGER.info(
+            "[seedqueue] benchmark generation limit restored to {}%",
+            savedMaxWorldGenerationPercentage
+         );
+         savedMaxWorldGenerationPercentage = -1;
+      }
+   }
 
    /** Cancels a running benchmark (also used from N / Esc while the overlay is up). */
    public static void cancelBenchmark() {
@@ -3698,6 +3794,7 @@ public final class SeedQueue implements ClientModInitializer {
       }
 
       benchmarking = false;
+      restoreGenerationLimit();
       benchmarkFinishedAt = System.currentTimeMillis();
       benchmarkResultResets = benchmarkCount;
       benchmarkResultMs = Math.max(1L, benchmarkFinishedAt - benchmarkStarted);

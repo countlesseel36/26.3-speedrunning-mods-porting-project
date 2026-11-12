@@ -42,7 +42,7 @@
   "seedqueue.key.resetLastLock": "Reset Last Lock",
   "seedqueue.key.scheduleJoin": "Schedule Instance",
   "seedqueue.key.scheduleAll": "Schedule All",
-  "seedqueue.key.startBenchmark": "§cWARNING: benchmarking is disabled because of an unresolved major bug (key and option are placeholders).",
+  "seedqueue.key.startBenchmark": "Start Benchmark",
   "seedqueue.key.cancelBenchmark": "Stop Benchmark",
   "seedqueue.key.quitWall": "Quit Wall Screen",
   "speedrunapi.config.seedqueue.category.queue": "Queue Settings",
@@ -56,7 +56,7 @@
   "speedrunapi.config.seedqueue.category.experimental": "Experimental Settings",
   "speedrunapi.config.seedqueue.category.debug": "Debug Settings",
   "speedrunapi.config.seedqueue.option.maxCapacity": "Max Queued Seeds",
-  "speedrunapi.config.seedqueue.option.maxCapacity.description": "Instances kept in the queue (maximum 10).\n§cWARNING: more than 6 risks running out of VRAM.",
+  "speedrunapi.config.seedqueue.option.maxCapacity.description": "Instances kept in the queue (maximum 10).",
   "speedrunapi.config.seedqueue.option.maxConcurrently": "Max Generating Seeds",
   "speedrunapi.config.seedqueue.option.maxConcurrently.description": "Maximum number of seeds that can be generating at the same time.",
   "speedrunapi.config.seedqueue.option.maxConcurrently_onWall": "Max Generating Seeds (Wall)",
@@ -130,7 +130,7 @@
   "speedrunapi.config.seedqueue.option.showDebugMenu": "Show Debug Menu",
   "speedrunapi.config.seedqueue.option.showDebugMenu.description": "Renders an FPS Graph and a Profiler on top of the Wall Screen.\n搂cUse this only for debugging, any runs played with this option enabled will be invalidated!",
   "speedrunapi.config.seedqueue.option.benchmarkResets": "Benchmark Resets",
-  "speedrunapi.config.seedqueue.option.benchmarkResets.description": "§cWARNING: benchmarking is disabled because of an unresolved major bug (key and option are placeholders).",
+  "speedrunapi.config.seedqueue.option.benchmarkResets.description": "How many resets a benchmark run performs (1-1000). Press B to start, N or Esc to cancel.",
   "speedrunapi.config.seedqueue.option.showChunkMaps": "Chunkmap Overlay",
   "speedrunapi.config.seedqueue.option.showChunkMaps.description": "Renders an overlay with all the chunkmaps of currently generating seeds.",
   "speedrunapi.config.seedqueue.option.checkMinMemory": "Check Allocated Memory",
@@ -179,6 +179,5 @@
   "speedrunapi.config.seedqueue.option.keyBindings.description": "Key bindings used on the wall (edited in the keybindings screen).",
   "speedrunapi.config.seedqueue.option.showChunkProgress": "Chunk Progress",
   "speedrunapi.config.seedqueue.option.showChunkProgress.description": "Show the generated/total chunk counter on the cards. Hidden by default.",
-  "seedqueue.key.backToWall": "Return to wall",
-  "speedrunapi.config.seedqueue.vramWarning": "§cWARNING: every queued instance owns a render target and VRAM; keep the queue at 6 or fewer (lower on 1440p/4K)."
+  "seedqueue.key.backToWall": "Return to wall"
 }

@@ -45,6 +45,11 @@ public final class QueueEntry {
    public volatile State state = State.CREATED;
    /** Benchmark instrumentation: when this entry was created / became ready / was discarded. */
    public long createdAt = System.currentTimeMillis();
+   /** 子阶段计时：服务端创建 / 区块生成 / 抓包 */
+   private long prepareT0;
+   private long serverMs;
+   private long genMs;
+   private long captureMs;
    public volatile long readyAt;
    public volatile long discardStartAt;
    private volatile boolean deleteAfterPrepare;
@@ -82,6 +87,19 @@ public final class QueueEntry {
    public volatile com.mojang.blaze3d.platform.NativeImage nativePreview;
    public volatile me.voidxwalker.worldpreview.ExternalPreview externalPreview;
    public volatile me.voidxwalker.worldpreview.WorldPreviewProperties renderProperties;
+   /** Estimated GPU bytes held by this entry's render targets (colour buffer + depth). */
+   public long targetBytes() {
+      long bytes = 0L;
+
+      for (com.mojang.blaze3d.pipeline.RenderTarget target : new com.mojang.blaze3d.pipeline.RenderTarget[] { this.displayTarget, this.renderTarget }) {
+         if (target != null) {
+            bytes += (long) target.width * target.height * 4L;
+         }
+      }
+
+      return bytes;
+   }
+
    public volatile com.mojang.blaze3d.pipeline.RenderTarget renderTarget;
    public volatile com.mojang.blaze3d.pipeline.RenderTarget displayTarget;
    /** prepareExternal (section tracker + allChanged) only has to run once per built preview level. */
@@ -141,6 +159,7 @@ public final class QueueEntry {
 
    public void prepare(Minecraft minecraft) {
       state = State.PREPARING;
+      prepareT0 = System.currentTimeMillis();
 
       try {
          worldDirectory = minecraft.getLevelSource().getBaseDir().resolve(folder);
@@ -191,6 +210,7 @@ public final class QueueEntry {
             )
             .get();
          access.saveDataTag(stem.worldDataAndGenSettings().data());
+         serverMs = System.currentTimeMillis() - prepareT0;
          state = State.PREPARED;
          SeedQueue.LOGGER.info("[seedqueue] prepared entry #{} ({})", number, folder);
       } catch (Throwable t) {
@@ -714,6 +734,8 @@ public final class QueueEntry {
             // Refill the snapshot while the server is still running (this is the prepare thread, before
             // park()). A chunk can be skipped when it was already loaded, so the preview level used to
             // end up with holes (16/25) that rendered as black in the cards.
+            genMs = System.currentTimeMillis() - prepareT0 - serverMs;
+            long captureStart = System.currentTimeMillis();
             if (Boolean.parseBoolean(System.getProperty("seedqueue.fillMissingChunks", "true"))) {
                int filled = 0;
 
@@ -726,16 +748,24 @@ public final class QueueEntry {
                      int chunkX = spawnX + dx;
                      int chunkZ = spawnZ + dz;
 
+
                      if (hasPacketFor(chunkX, chunkZ)) {
+
+
                         continue;
+
+
                      }
 
-                     // The generation loop can miss either edge (x or z, depending on which ring it
-                     // stopped in), so only skip the interior: at most 16 edge chunks are forced, and a
-                     // missing edge showed up as a black band in the cards.
+
+                     // 只补外圈缺失的区块：预览实测并不缺块，全量强制生成只会拖慢构建
                      if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
                         continue;
                      }
+
+
+
+
 
                      try {
                         net.minecraft.world.level.chunk.LevelChunk chunk =
@@ -759,6 +789,7 @@ public final class QueueEntry {
                   }
                }
 
+            this.captureMs = System.currentTimeMillis() - captureStart;
                int expected = (2 * radius + 1) * (2 * radius + 1);
                SeedQueue.LOGGER.info(
                   "[seedqueue] entry #{} preview packets: {} ({} filled, expected {})",
@@ -788,7 +819,10 @@ public final class QueueEntry {
                }
             }
 
+            genMs = System.currentTimeMillis() - prepareT0 - serverMs;
+            // (removed duplicate captureStart)
             captureMap(level, spawnX, spawnZ);
+            long captureMs = System.currentTimeMillis() - captureStart;
             state = State.READY;
       readyAt = System.currentTimeMillis();
             readyAtMillis = System.currentTimeMillis();
@@ -802,11 +836,14 @@ public final class QueueEntry {
             }
             park();
             SeedQueue.LOGGER.info(
-               "[seedqueue] entry #{} ready (seed {}, {} chunks in {} ms)",
+               "[seedqueue] entry #{} ready (seed {}, {} chunks in {} ms; server={}ms gen={}ms capture={}ms)",
                number,
                seed,
                chunksGenerated,
-               System.currentTimeMillis() - started
+               System.currentTimeMillis() - prepareT0,
+               serverMs,
+               genMs,
+               captureMs
             );
 
             SeedQueue.logMemory("after entry #" + number + " ready");
@@ -826,6 +863,7 @@ public final class QueueEntry {
     * the destroy call failed 244 times and the buffers stayed alive.</p>
     */
    private void destroyTarget(com.mojang.blaze3d.pipeline.RenderTarget target, String label) {
+
       if (target == null) {
          return;
       }

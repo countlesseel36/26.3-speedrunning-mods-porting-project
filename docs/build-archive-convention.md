@@ -147,3 +147,4 @@ dist/
 - 只有对应模组**真的发生改动**时才提升它的版本，未改动的模组保持原版本号随包发布；
 - 每次构建完成追加一行到本文件的构建日志表。
 | 2026-11-12 | SeedQueue | `0.9.0-rc.4-build.10+26.3` | 跑分分段计时与现状分析，优化方案记录于 `docs/benchmark-analysis.md`（暂不实施） | `dist/` |
+| 2026-11-12 | SeedQueue | `0.9.0-rc.4-build.28+26.3` | 跑分实测、子阶段计时、预览误判回退；记录于 `docs/benchmark-and-preview-notes.md`（未提交） | `dist/` |
