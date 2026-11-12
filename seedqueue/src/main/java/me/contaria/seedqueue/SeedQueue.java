@@ -1054,50 +1054,55 @@ public final class SeedQueue implements ClientModInitializer {
 
       if (benchmarking) {
          for (QueueEntry entry : new ArrayList<>(ENTRIES)) {
-            if (entry.state == QueueEntry.State.READY && !entry.locked) {
-               ENTRIES.remove(entry);
+            if (entry.state != QueueEntry.State.READY || entry.locked) {
+               continue;
+            }
 
-               // Deliberately no PreviewState.unbind() here: unbinding during a benchmark removed the
-               // only thing rendering behind the overlay (black screen). The next frame simply binds
-               // another entry.
-               if (PreviewState.frameSwapEntry == entry) {
-                  PreviewState.frameSwapEntry = null;
-               }
+            ENTRIES.remove(entry);
 
-               discardAsync(entry);
-               if (benchmarkCount == 0) {
-                  benchmarkStarted = System.currentTimeMillis();
-               }
-               benchmarkCount++;
-               // The benchmark consumes READY entries and refills the queue; that loop normally runs from the
-      // wall update, which stops as soon as the benchmark overlay closes the wall. Drive it from the
-      // tick instead so a benchmark keeps making progress outside the wall screen.
-      if (benchmarking && !(minecraft.gui.screen() instanceof WallScreen)) {
-         wallScheduledTick(minecraft);
+            if (PreviewState.frameSwapEntry == entry) {
+               PreviewState.frameSwapEntry = null;
+            }
+
+            discardAsync(entry);
+
+            if (benchmarkCount == 0) {
+               benchmarkLastResetAt = System.currentTimeMillis();
+            }
+
+            benchmarkCount++;
+
+            long now = System.currentTimeMillis();
+            long delta = benchmarkLastResetAt == 0L ? 0L : now - benchmarkLastResetAt;
+            benchmarkLastResetAt = now;
+            long discardMs = entry.discardStartAt == 0L ? 0L : System.currentTimeMillis() - entry.discardStartAt;
+            long buildMs = entry.readyAt == 0L ? -1L : entry.readyAt - entry.createdAt;
+            LOGGER.info(
+               "[seedqueue] benchmark reset {} took {} ms (build {} ms, queued {} ms)",
+               benchmarkCount, delta, buildMs,
+               entry.readyAt == 0L ? -1L : System.currentTimeMillis() - entry.readyAt
+            );
+
+            if (benchmarkCount >= Integer.getInteger("seedqueue.benchmarkResets", QueueConfig.benchmarkResets)) {
+               benchmarking = false;
+               benchmarkFinishedAt = System.currentTimeMillis();
+               benchmarkResultResets = benchmarkCount;
+               benchmarkResultMs = Math.max(1L, benchmarkFinishedAt - benchmarkStarted);
+               playSound("finish_benchmark");
+               LOGGER.info(
+                  "[seedqueue] SEEDQUEUE_BENCHMARK {} resets in {} ms",
+                  benchmarkCount,
+                  benchmarkFinishedAt - benchmarkStarted
+               );
+            }
+
+            break;
+         }
       }
-
 
       if (--refillCooldown <= 0) {
          refillCooldown = Math.max(1, Integer.getInteger("seedqueue.refillIntervalTicks", 10));
          refillQueue(minecraft);
-      }
-
-               if (benchmarkCount >= Integer.getInteger("seedqueue.benchmarkResets", QueueConfig.benchmarkResets)) {
-                  benchmarking = false;
-                  benchmarkFinishedAt = System.currentTimeMillis();
-                  benchmarkResultResets = benchmarkCount;
-                  benchmarkResultMs = Math.max(1L, benchmarkFinishedAt - benchmarkStarted);
-                  playSound("finish_benchmark");
-                  LOGGER.info(
-                     "[seedqueue] SEEDQUEUE_BENCHMARK {} resets in {} ms",
-                     benchmarkCount,
-                     System.currentTimeMillis() - benchmarkStarted
-                  );
-               }
-
-               break;
-            }
-         }
       }
    }
 
@@ -1208,6 +1213,17 @@ public final class SeedQueue implements ClientModInitializer {
       }
 
       LOGGER.info("[seedqueue] returning to the wall from a joined world");
+
+      // Use FastReset's skip-save path: the queued world is discarded anyway, so waiting for
+      // saveAllChunks here only made F6 take seconds.
+      boolean fastResetWasSkipping = false;
+
+      try {
+         fastResetWasSkipping = fast_reset.client.FastReset.skipSavesNow;
+         fast_reset.client.FastReset.skipSavesNow = true;
+      } catch (Throwable ignored) {
+      }
+
       me.voidxwalker.worldpreview.WorldPreview.releasePreviewCameraAndEntities(minecraft);
       TimerCompat.stop();
       stopPreviewCycle(minecraft);
@@ -1247,6 +1263,14 @@ public final class SeedQueue implements ClientModInitializer {
 
       // Set it immediately (the normal pause return relies on this), and keep a pending flag so the
       // tick can put the wall back if vanilla's disconnect completion replaced it.
+      // Clear the flag on the next tick: vanilla saves during disconnect, which is now skipped.
+      try {
+         if (!fastResetWasSkipping) {
+            minecraft.execute(() -> fast_reset.client.FastReset.skipSavesNow = false);
+         }
+      } catch (Throwable ignored) {
+      }
+
       minecraft.setScreenAndShow(wallScreen);
       pendingWallReturn = true;
       wallReturnTicks = 0;
@@ -2204,6 +2228,41 @@ public final class SeedQueue implements ClientModInitializer {
 
       // Re-assert the wall after a return: vanilla's disconnect completion sets the title screen on a
       // later tick and used to swallow it (F6 from the F3+Esc pause ended on the title screen).
+      // "play next locked instance" pressed inside a world: once the wall is up again, join it
+      // 跑分覆盖层会接管输入，按键 mixin 收不到事件；直接轮询按键状态来取消
+      if (benchmarking) {
+         int cancel = WallKeybindings.key(WallKeybindings.Action.CANCEL_BENCHMARK);
+         int quit = WallKeybindings.key(WallKeybindings.Action.QUIT);
+
+         if ((cancel != WallKeybindings.UNKNOWN
+               && com.mojang.blaze3d.platform.InputConstants.isKeyDown(cancel))
+            || (quit != WallKeybindings.UNKNOWN
+               && com.mojang.blaze3d.platform.InputConstants.isKeyDown(quit))) {
+            cancelBenchmark();
+         }
+      }
+
+      // 跑分时队列被清空后，补队列逻辑依赖墙的更新流程；这里直接驱动，避免只跑一次就停住
+      if (benchmarking && ENTRIES.isEmpty() && refillCooldown > 1) {
+         refillCooldown = 0;
+      }
+
+      // Benchmark keeps running outside the wall: the overlay is not a WallScreen, so the
+      // wall-driven update would stop and the reset loop would stall.
+      if (benchmarking) {
+         wallScheduledTick(minecraft);
+      }
+
+      if (pendingPlayNextLock && minecraft.level == null) {
+         if (minecraft.gui.screen() instanceof WallScreen) {
+            pendingPlayNextLock = false;
+            playNextLock(minecraft);
+         } else if (!pendingWallReturn && ++wallReturnTicks >= 1) {
+            pendingPlayNextLock = false;
+            playNextLock(minecraft);
+         }
+      }
+
       if (pendingWallReturn && minecraft.level == null) {
          if (minecraft.gui.screen() instanceof WallScreen) {
             pendingWallReturn = false;
@@ -3235,6 +3294,7 @@ public final class SeedQueue implements ClientModInitializer {
 
    /** Discards an entry on the background executor; never blocks the render thread. */
    private static void discardAsync(QueueEntry entry) {
+      entry.discardStartAt = System.currentTimeMillis();
       try {
          QueueExecutors.prepare().execute(entry::discard);
       } catch (Throwable t) {
@@ -3384,7 +3444,7 @@ public final class SeedQueue implements ClientModInitializer {
       java.util.List<QueueEntry> candidates = new java.util.ArrayList<>();
 
       for (QueueEntry entry : ENTRIES) {
-         if (entry.parked && !entry.selected && !entry.transferred && entry != liveEntry) {
+         if (entry.parked && !entry.locked && !entry.selected && !entry.transferred && entry != liveEntry) {
             candidates.add(entry);
          }
       }
@@ -3594,22 +3654,114 @@ public final class SeedQueue implements ClientModInitializer {
    }
 
    /** 1.21.4 "Play Next Lock": plays the oldest locked world that is ready. */
+   private static boolean pendingPlayNextLock;
+
+   /** Queues "play next locked instance" for the next tick (used from inside a world). */
+   public static void requestPlayNextLock() {
+      pendingPlayNextLock = true;
+   }
+
+   /** True when at least one locked entry could be played. */
+   public static boolean hasLockedCandidate() {
+      for (QueueEntry entry : ENTRIES) {
+         if (entry.locked && !entry.transferred) {
+            return true;
+         }
+      }
+
+      return false;
+   }
+
+   private static long lastPlayNextLockAt;
+
+   /** Starts a benchmark run from the wall. */
+   public static void startBenchmark() {
+      // 跑分进行中再次按 B 只会重启计数，忽略
+      if (benchmarking) {
+         LOGGER.info("[seedqueue] benchmark already running, ignoring start");
+         return;
+      }
+
+      benchmarking = true;
+      benchmarkCount = 0;
+      benchmarkStarted = System.currentTimeMillis();
+      benchmarkLastResetAt = 0L;
+      LOGGER.info("[seedqueue] benchmark started ({} resets)", Integer.getInteger("seedqueue.benchmarkResets", QueueConfig.benchmarkResets));
+   }
+
+   private static long benchmarkLastResetAt;
+
+   /** Cancels a running benchmark (also used from N / Esc while the overlay is up). */
+   public static void cancelBenchmark() {
+      if (!benchmarking) {
+         return;
+      }
+
+      benchmarking = false;
+      benchmarkFinishedAt = System.currentTimeMillis();
+      benchmarkResultResets = benchmarkCount;
+      benchmarkResultMs = Math.max(1L, benchmarkFinishedAt - benchmarkStarted);
+      playSound("finish_benchmark");
+
+      // 覆盖层若还在，取消时一并关闭
+      Minecraft client = Minecraft.getInstance();
+
+      if (client.gui.screen() != null && !(client.gui.screen() instanceof WallScreen)) {
+         client.gui.setScreen(new WallScreen(() -> ENTRIES));
+      }
+
+      LOGGER.info("[seedqueue] benchmark cancelled after {} resets", benchmarkCount);
+   }
+
    public static boolean playNextLock(Minecraft minecraft) {
+      // 连按 M 会把多次"进入"叠加在一起，表现为卡在"保存世界中"
+      if (System.currentTimeMillis() - lastPlayNextLockAt < 750L) {
+         LOGGER.info("[seedqueue] play next lock: ignored (debounce)");
+         return false;
+      }
+
+      lastPlayNextLockAt = System.currentTimeMillis();
       QueueEntry next = null;
 
       for (QueueEntry entry : ENTRIES) {
-         if (entry.locked && entry.state == QueueEntry.State.READY && !entry.transferred
-            && (next == null || entry.lockedAt < next.lockedAt)) {
+         if (entry.locked && !entry.transferred && (next == null || entry.lockedAt < next.lockedAt)) {
             next = entry;
          }
       }
 
       if (next == null) {
-         LOGGER.info("[seedqueue] play next lock: no locked ready entry");
+         int locked = 0;
+         int lockedReady = 0;
+         StringBuilder states = new StringBuilder();
+
+         for (QueueEntry entry : ENTRIES) {
+            if (entry.locked) {
+               locked++;
+
+               if (entry.state == QueueEntry.State.READY && !entry.transferred) {
+                  lockedReady++;
+               }
+
+               states.append(" #").append(entry.number).append(':').append(entry.state)
+                  .append(entry.transferred ? "(transferred)" : "");
+            }
+         }
+
+         LOGGER.warn(
+            "[seedqueue] play next lock: no locked ready entry (entries={}, locked={}, lockedReady={} ->{})",
+            ENTRIES.size(), locked, lockedReady, states
+         );
          return false;
       }
 
       LOGGER.info("[seedqueue] play next lock: entry #{}", next.number);
+      if (next.state != QueueEntry.State.READY) {
+         // 还没 ready：选中它，等就绪后由正常的进入流程接管
+         next.selected = true;
+         LOGGER.info("[seedqueue] play next lock: entry #{} is {} - selected until ready", next.number, next.state);
+         return true;
+      }
+
       return playEntry(next);
    }
 

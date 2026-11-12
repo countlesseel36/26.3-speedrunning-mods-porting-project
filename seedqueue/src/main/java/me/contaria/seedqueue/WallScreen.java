@@ -83,6 +83,14 @@ public final class WallScreen extends Screen {
          return true;
       }
 
+      if (Boolean.getBoolean("seedqueue.keysLog")) {
+         SeedQueue.LOGGER.info(
+            "[seedqueue] wall key raw={} normalized={} action={} binding.play={}",
+            event.key(), WallKeybindings.keyOf(event), WallKeybindings.match(event),
+            WallKeybindings.binding(WallKeybindings.Action.PLAY).primary
+         );
+      }
+
       WallKeybindings.Action action = WallKeybindings.match(event);
       QueueEntry hovered = hoveredEntry;
 
@@ -152,30 +160,7 @@ public final class WallScreen extends Screen {
                SeedQueue.scheduleAll();
                return true;
             case START_BENCHMARK:
-               // Disabled for now: the benchmark never reached a usable state (it kept cancelling and
-               // measured generation time instead of reset time). The key and the option stay in the
-               // config screen with a warning.
-               SeedQueue.LOGGER.warn("[seedqueue] benchmark is disabled in this build");
-               return true;
-
-            case CANCEL_BENCHMARK:
-               SeedQueue.benchmarking = false;
-               SeedQueue.playSound("finish_benchmark");
-               SeedQueue.LOGGER.info("[seedqueue] benchmark cancelled after {} resets", SeedQueue.benchmarkCount);
-               return true;
-            case FOCUS_RESET:
-               if (hovered != null && SeedQueue.playEntry(hovered)) {
-                  if (QueueConfig.tryResetCooldown()) {
-                     SeedQueue.resetAllUnlocked();
-                     SeedQueue.refillQueue(this.minecraft);
-                  }
-               }
-
-               return true;
-            case QUIT:
-               this.onClose();
-               return true;
-            default:
+               SeedQueue.startBenchmark();
                break;
          }
       }
@@ -603,7 +588,8 @@ public final class WallScreen extends Screen {
       long now = System.currentTimeMillis();
 
       if (!SeedQueue.benchmarking) {
-         if (SeedQueue.benchmarkFinishedAt == 0 || now - SeedQueue.benchmarkFinishedAt > 12000L) {
+         // 结果面板保留 15 秒后自动消失
+         if (SeedQueue.benchmarkFinishedAt == 0 || now - SeedQueue.benchmarkFinishedAt > 15000L) {
             return;
          }
 

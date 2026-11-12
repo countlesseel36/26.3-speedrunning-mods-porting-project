@@ -64,21 +64,21 @@ public final class WallKeybindings {
    private static final Map<Action, Binding> BINDINGS = new EnumMap<>(Action.class);
 
    static {
-      DEFAULTS.put(Action.PLAY, new Binding(InputConstants.KEY_R));
-      DEFAULTS.put(Action.LOCK, new Binding(InputConstants.KEY_L));
-      DEFAULTS.put(Action.RESET, new Binding(InputConstants.KEY_E));
-      DEFAULTS.put(Action.RESET_ALL, new Binding(InputConstants.KEY_T));
-      DEFAULTS.put(Action.FOCUS_RESET, new Binding(InputConstants.KEY_F));
-      DEFAULTS.put(Action.SCHEDULE_JOIN, new Binding(InputConstants.KEY_G));
-      DEFAULTS.put(Action.SCHEDULE_ALL, new Binding(InputConstants.KEY_H));
-      DEFAULTS.put(Action.RESET_COLUMN, new Binding(InputConstants.KEY_K));
-      DEFAULTS.put(Action.RESET_ROW, new Binding(InputConstants.KEY_J));
-      DEFAULTS.put(Action.PLAY_NEXT_LOCK, new Binding(InputConstants.KEY_M));
-      DEFAULTS.put(Action.BACK_TO_WALL, new Binding(InputConstants.KEY_F6));
-      DEFAULTS.put(Action.START_BENCHMARK, new Binding(InputConstants.KEY_B));
-      DEFAULTS.put(Action.CANCEL_BENCHMARK, new Binding(InputConstants.KEY_N));
+      DEFAULTS.put(Action.PLAY, new Binding(key("key.keyboard.r")));
+      DEFAULTS.put(Action.LOCK, new Binding(key("key.keyboard.l")));
+      DEFAULTS.put(Action.RESET, new Binding(key("key.keyboard.e")));
+      DEFAULTS.put(Action.RESET_ALL, new Binding(key("key.keyboard.t")));
+      DEFAULTS.put(Action.FOCUS_RESET, new Binding(key("key.keyboard.f")));
+      DEFAULTS.put(Action.SCHEDULE_JOIN, new Binding(key("key.keyboard.g")));
+      DEFAULTS.put(Action.SCHEDULE_ALL, new Binding(key("key.keyboard.h")));
+      DEFAULTS.put(Action.RESET_COLUMN, new Binding(key("key.keyboard.k")));
+      DEFAULTS.put(Action.RESET_ROW, new Binding(key("key.keyboard.j")));
+      DEFAULTS.put(Action.PLAY_NEXT_LOCK, new Binding(key("key.keyboard.m")));
+      DEFAULTS.put(Action.BACK_TO_WALL, new Binding(key("key.keyboard.f6")));
+      DEFAULTS.put(Action.START_BENCHMARK, new Binding(key("key.keyboard.b")));
+      DEFAULTS.put(Action.CANCEL_BENCHMARK, new Binding(key("key.keyboard.n")));
       // Escape closes the wall through the vanilla screen handling; the binding stays unbound.
-      DEFAULTS.put(Action.QUIT, new Binding(InputConstants.KEY_ESCAPE));
+      DEFAULTS.put(Action.QUIT, new Binding(key("key.keyboard.escape")));
       resetDefaults();
       // "Play Next Lock" is a single key (M). Combination keys were removed because the SDL input
       // path could not report modifier state, which made Shift + M silently dead.
@@ -160,6 +160,20 @@ public final class WallKeybindings {
     * values, so a default such as F6 (295) never matched the raw event code. Bindings and comparisons
     * now both go through this conversion.</p>
     */
+   /** Vanilla key lookup by name, tolerant of unknown names. */
+   public static int key(String name) {
+      try {
+         return InputConstants.getKey(name).getValue();
+      } catch (Throwable t) {
+         return UNKNOWN;
+      }
+   }
+
+   /**
+    * Converts an input event to the same {@code InputConstants.Key} value vanilla stores in
+    * KeyMapping. 26.3 is SDL3 based, so this conversion (not {@code event.key()}) is the source of
+    * truth; it is also what vanilla uses to display and compare keys.
+    */
    public static int keyOf(KeyEvent event) {
       try {
          return InputConstants.getKey(event).getValue();
@@ -184,8 +198,17 @@ public final class WallKeybindings {
       return null;
    }
 
+   /**
+    * 旧配置里存的是 SDL 扫描码（M=16）而不是键码（M=77），所以先按键码匹配，失败再按原始 key() 匹配。
+    */
    public static Action match(KeyEvent event) {
-      return matchCode(keyOf(event));
+      Action matched = matchCode(keyOf(event));
+
+      if (matched != null) {
+         return matched;
+      }
+
+      return matchCode(event.key());
    }
 
    public static String translationKey(Action action) {
@@ -207,13 +230,71 @@ public final class WallKeybindings {
       };
    }
 
+   private static boolean isGlfwCode(int key) {
+      return (key >= 65 && key <= 90) || (key >= 48 && key <= 57) || key >= 256;
+   }
+
+   /** SDL scancode -> GLFW key code, only for producing the vanilla key name. */
+   private static int scancodeToGlfw(int scan) {
+      int letter = scan - 3;
+
+      if (letter >= 1 && letter <= 26) return 64 + letter;
+      if (scan >= 30 && scan <= 38) return 48 + (scan - 29);
+      if (scan == 39) return 48;
+      if (scan == 40) return 257;
+      if (scan == 41) return 256;
+      if (scan == 42) return 259;
+      if (scan == 43) return 258;
+      if (scan == 44) return 32;
+      if (scan >= 58 && scan <= 69) return 289 + (scan - 57);
+
+      return scan;
+   }
+
    public static String display(int key) {
       if (key == UNKNOWN) {
          // Same wording as the vanilla unbound state ("未指定" in Chinese).
          return net.minecraft.locale.Language.getInstance().getOrDefault("key.keyboard.unknown");
       }
 
+      if (isMouse(key)) {
+         int button = mouseButton(key);
+         return switch (button) {
+            case 0 -> net.minecraft.locale.Language.getInstance().getOrDefault("key.mouse.left");
+            case 1 -> net.minecraft.locale.Language.getInstance().getOrDefault("key.mouse.right");
+            case 2 -> net.minecraft.locale.Language.getInstance().getOrDefault("key.mouse.middle");
+            default -> net.minecraft.locale.Language.getInstance().getOrDefault("key.mouse") + " " + (button + 1);
+         };
+      }
+
       return InputConstants.Type.KEYBOARD.getOrCreate(key).getDisplayName().getString();
+   }
+
+   /** 把早期写入的 SDL 扫描码迁移成 GLFW 键码（4..29 = A..Z 等）。 */
+   private static int migrateScancode(int value) {
+      if (value <= 3 || value > 255) {
+         return value;
+      }
+
+      int letter = value - 3;
+
+      if (letter >= 1 && letter <= 26) {
+         return 64 + letter;
+      }
+
+      if (value >= 30 && value <= 38) {
+         return 48 + (value - 29);
+      }
+
+      if (value == 39) return 48;
+      if (value == 40) return 257;
+      if (value == 41) return 256;
+      if (value == 42) return 259;
+      if (value == 43) return 258;
+      if (value == 44) return 32;
+      if (value >= 58 && value <= 69) return 289 + (value - 57);
+
+      return value;
    }
 
    public static void load(JsonObject json) {
@@ -233,7 +314,7 @@ public final class WallKeybindings {
          binding.blocking.clear();
 
          if (element.isJsonPrimitive()) {
-            binding.primary = element.getAsInt();
+            binding.primary = element.getAsInt();   // SDL scancode
          } else if (element.isJsonObject()) {
             JsonObject object = element.getAsJsonObject();
             binding.primary = object.has("primary") ? object.get("primary").getAsInt() : UNKNOWN;

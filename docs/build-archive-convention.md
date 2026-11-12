@@ -101,3 +101,49 @@ Copy-Item "dist\past-build\SeedQueue\0.9.0-rc.27+26.3-SeedQueue.jar" $mods -Forc
 | 2026-11-10 | SeedQueue | `0.9.0-rc.2-disabled-benchmark.1+26.3` | 显存泄漏重大修复（渲染目标释放 + 渲染线程销毁）；暂停界面 F6 回墙；v0.3.1 发布构建 | `dist/` |
 | 2026-11-10 | 归档 / archive | — | 将 `dist/` 中 rc.1-disabled-benchmark.1–.10 等 10 个历史 SeedQueue 构建移入 `dist/past-build/SeedQueue/`；根目录只保留 6 个当前发布 jar | `dist/past-build/` |
 | 2026-11-12 | SeedQueue / SpeedrunAPI / StandardSettings | `0.9.0-rc.2-disabled-benchmark.16` / `2.1.0-rc.1-disabled-benchmark.23` / `2.3.0-rc.1-build.6` | v0.3.2 发布构建：分组/排序修正、鼠标键修复、显存泄漏修复 | `dist/` |
+
+## 归档结构（当前）
+
+```
+dist/
+├─ 0.9.0-rc.3-disabled-benchmark.7+26.3-SeedQueue.jar     ← 各模组当前构建
+├─ 2.1.0-rc.2-disabled-benchmark.1+26.3-Speedrun-API.jar
+├─ 2.3.0-rc.2-build.1+26.3-StandardSettings.jar
+├─ 6.3.0-rc.1-build.1+26.3-WorldPreview.jar
+├─ 1.4.0-rc.2-build.1+26.3-Atum.jar
+├─ 1.6.0-rc.1-build.1+26.3-FastReset.jar
+└─ past-build/
+   ├─ SeedQueue/        118 个历史构建
+   │  └─ beta/           34 个 0.9.0-beta.* 构建（原 archive/seedqueue-beta-0.9.0）
+   ├─ SpeedrunAPI/       31 (+ beta 34)
+   ├─ StandardSettings/  12 (+ beta 16)
+   ├─ WorldPreview/       2 (+ beta 6)
+   ├─ Atum/               3 (+ beta 4)
+   └─ FastReset/          1 (+ beta 2)
+```
+
+- 非 beta 历史构建放在 `past-build/<Mod>/`；
+- beta 阶段构建统一放在 `past-build/<Mod>/beta/`，便于与 rc 阶段区分；
+| 2026-11-12 | 归档 / archive | — | 所有旧 build 与 beta 版本归档：SeedQueue 118(+beta34)、SpeedrunAPI 31(+beta34)、StandardSettings 12(+beta16)、WorldPreview 2(+beta6)、Atum 3(+beta4)、FastReset 1(+beta2) | `dist/past-build/` |
+| 2026-11-12 | SeedQueue 回滚 / rollback | `0.9.0-rc.3-disabled-benchmark.2+26.3` | 回滚到 benchmark.2：`.7`–`.11` 归档到 `past-build/SeedQueue/`，根目录与实例保持 `.2`，版本号不变 | `dist/past-build/SeedQueue/` |
+
+## 版本命名（自 2026-11-12 起生效）
+
+下一次**代码改动**起，不再沿用当前的 `rc.3-disabled-benchmark.2` 线，统一进入 **rc.4 线**，并保留 `disabled-benchmark` 后缀语义：
+
+| 模组 | 下一次构建的版本 |
+| --- | --- |
+| SeedQueue | `0.9.0-rc.4-disabled-benchmark.1+26.3` |
+| SpeedrunAPI | `2.1.0-rc.3-disabled-benchmark.1+26.3` |
+| StandardSettings | `2.3.0-rc.3-build.1+26.3` |
+| Atum | `1.4.0-rc.3-build.1+26.3` |
+| WorldPreview | 保持不变：`6.3.0-rc.1-build.1+26.3` |
+| FastReset | 保持不变：`1.6.0-rc.1-build.1+26.3` |
+
+规则：
+
+- 主版本线递增（rc.N → rc.N+1）时，构建号从 `.1` 重新开始；
+- 仍处于停用状态的实验功能继续使用 `-disabled-benchmark` 后缀，并在 release 说明中注明；
+- 只有对应模组**真的发生改动**时才提升它的版本，未改动的模组保持原版本号随包发布；
+- 每次构建完成追加一行到本文件的构建日志表。
+| 2026-11-12 | SeedQueue | `0.9.0-rc.4-build.10+26.3` | 跑分分段计时与现状分析，优化方案记录于 `docs/benchmark-analysis.md`（暂不实施） | `dist/` |

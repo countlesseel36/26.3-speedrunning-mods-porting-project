@@ -43,6 +43,10 @@ public final class QueueEntry {
    public final long seed;
    public final String folder;
    public volatile State state = State.CREATED;
+   /** Benchmark instrumentation: when this entry was created / became ready / was discarded. */
+   public long createdAt = System.currentTimeMillis();
+   public volatile long readyAt;
+   public volatile long discardStartAt;
    private volatile boolean deleteAfterPrepare;
    public volatile LevelStorageSource.LevelStorageAccess access;
    public volatile PackRepository packs;
@@ -786,6 +790,7 @@ public final class QueueEntry {
 
             captureMap(level, spawnX, spawnZ);
             state = State.READY;
+      readyAt = System.currentTimeMillis();
             readyAtMillis = System.currentTimeMillis();
 
             // World preview is now visible: keep generating outer rings in the background and feed

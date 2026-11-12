@@ -35,9 +35,47 @@ public class KeyboardHandlerMixin {
          return;
       }
 
+      // 跑分覆盖层不是 WallScreen，N / Esc 收不到，所以在全局按键层处理取消
+      if (SeedQueue.benchmarking) {
+         int cancel = WallKeybindings.key(WallKeybindings.Action.CANCEL_BENCHMARK);
+         int quit = WallKeybindings.key(WallKeybindings.Action.QUIT);
+         int code = WallKeybindings.keyOf(event);
+
+         if ((cancel != WallKeybindings.UNKNOWN && code == cancel)
+            || (quit != WallKeybindings.UNKNOWN && code == quit)) {
+            SeedQueue.cancelBenchmark();
+            ci.cancel();
+            return;
+         }
+      }
+
       int backToWall = WallKeybindings.key(WallKeybindings.Action.BACK_TO_WALL);
 
-      if (backToWall == WallKeybindings.UNKNOWN || WallKeybindings.keyOf(event) != backToWall) {
+      int playNextLock = WallKeybindings.key(WallKeybindings.Action.PLAY_NEXT_LOCK);
+      int pressed = WallKeybindings.keyOf(event);
+
+      if (playNextLock != WallKeybindings.UNKNOWN && pressed == playNextLock) {
+         // 世界里没有锁定实例时什么都不做（不要回墙）
+         if (!SeedQueue.hasLockedCandidate()) {
+            SeedQueue.LOGGER.info("[seedqueue] play next lock: no locked entry, staying in the world");
+            ci.cancel();
+            return;
+         }
+
+         // 在世界里按"进入下个锁定实例"：跳过保存直接回墙并立即进入下一张锁定卡
+         if (SeedQueue.returnToWallFromJoinedWorld(client)) {
+            if (screen != null) {
+               client.gui.setScreen(null);
+            }
+
+            SeedQueue.requestPlayNextLock();
+            ci.cancel();
+         }
+
+         return;
+      }
+
+      if (backToWall == WallKeybindings.UNKNOWN || pressed != backToWall) {
          return;
       }
 
