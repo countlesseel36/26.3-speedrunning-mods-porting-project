@@ -510,7 +510,10 @@ public final class QueueEntry {
 
    /** Freezes the instance: the background server stops ticking but stays in memory. */
    public void park() {
-      if (state == State.READY && server != null && !selected) {
+      // Never park a world the player is in: a parked server stops ticking, the client times out and
+      // the game suddenly reports that it cannot reach the server.
+      if (state == State.READY && server != null && !selected && !transferred
+         && this != me.contaria.seedqueue.SeedQueue.liveEntry()) {
          parked = true;
          frozen = true;
          SeedQueue.LOGGER.info("[seedqueue] entry #{} frozen (server parked, world kept loaded)", number);
@@ -577,6 +580,7 @@ public final class QueueEntry {
     * server already has the spawn chunks, so the vanilla loading screen never appears.
     */
    public boolean play(Minecraft minecraft) {
+
       if (state != State.READY || transferred || server == null || access == null || stem == null) {
          return false;
       }

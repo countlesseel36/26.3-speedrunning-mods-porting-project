@@ -45,6 +45,10 @@ public abstract class TitleScreenMixin extends Screen {
       this.atum$resetButton = this.addRenderableWidget(Button.builder(Component.empty(), button -> {
          if (this.minecraft.hasShiftDown()) {
             Atum.openOptionsScreen(this);
+         } else if (Atum.SEEDQUEUE_PRESENT) {
+            // With SeedQueue installed the wall owns world creation and resets, so the single-instance
+            // reset from the boots is disabled; shift-click still opens Atum's options.
+            Atum.LOGGER.info("[atum] single-instance reset disabled while SeedQueue is installed");
          } else {
             Atum.scheduleReset();
          }

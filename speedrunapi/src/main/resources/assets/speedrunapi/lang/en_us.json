@@ -31,5 +31,12 @@
   "speedrunapi.group.chat": "Chat",
   "speedrunapi.group.mouse": "Mouse",
   "speedrunapi.group.skin": "Skin",
-  "speedrunapi.group.video": "Video"
+  "speedrunapi.group.video": "Video",
+  "speedrunapi.config.seedqueue.benchmarkWarning": "Benchmarking is disabled because of an unresolved major bug (key and option are placeholders).",
+  "speedrunapi.group.vanillaOptions": "Vanilla Options",
+  "speedrunapi.group.vanillaLanguage": "Language",
+  "speedrunapi.group.vanillaOnline": "Online",
+  "speedrunapi.group.vanillaTelemetry": "Telemetry",
+  "speedrunapi.group.global": "Global",
+  "speedrunapi.group.accessibility": "Accessibility"
 }

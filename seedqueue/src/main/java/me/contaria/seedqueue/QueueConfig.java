@@ -92,7 +92,10 @@ public final class QueueConfig {
       return FabricLoader.getInstance().getConfigDir().resolve("seedqueue.json");
    }
 
+   private static boolean loaded;
+
    public static void load() {
+      loaded = true;
       try {
          Path path = path();
 
@@ -199,6 +202,13 @@ public final class QueueConfig {
    }
 
    public static void save() {
+      if (!loaded) {
+         // Something applied a SeedQueue option before the config was read (SpeedrunAPI initialises its
+         // options early). Writing then would persist default wall keys over the user's bindings, which
+         // is why rebinds came back as defaults after a restart.
+         load();
+      }
+
       try {
          JsonObject json = new JsonObject();
          json.addProperty("queueSize", queueSize);
@@ -247,19 +257,17 @@ public final class QueueConfig {
          json.addProperty("joinTransition", joinTransition);
          json.addProperty("chunkMapFreezing", chunkMapFreezing);
          json.addProperty("checkMinMemory", checkMinMemory);
-         json.add("keyBindings", WallKeybindings.save());
+         JsonObject wallKeys = WallKeybindings.save();
+      json.add("keyBindings", wallKeys);
+
+      if (Boolean.getBoolean("seedqueue.keysLog")) {
+         SeedQueue.LOGGER.info("[seedqueue] saving wall keys: {}", wallKeys);
+      }
          Path path = path();
          Files.createDirectories(path.getParent());
-         // Asynchronous: saving happens on key rebinds and option toggles, and the file IO used to run
-      // on the client thread.
-      String payload = GSON.toJson(json);
-      java.util.concurrent.CompletableFuture.runAsync(() -> {
-         try {
-            Files.writeString(path, payload);
-         } catch (Throwable t) {
-            me.contaria.seedqueue.SeedQueue.LOGGER.warn("[seedqueue] failed to save the config", t);
-         }
-      });
+         // Synchronous again: the asynchronous write was still in flight when the exit watchdog halted the
+      // JVM, so key rebinds were silently lost on the next launch. The file is tiny.
+      Files.writeString(path, GSON.toJson(json));
       } catch (Throwable t) {
          SeedQueue.LOGGER.warn("[seedqueue] failed to save config", t);
       }

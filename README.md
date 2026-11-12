@@ -2,7 +2,7 @@
 
 ## 警告 / WARNING
 
-**WARNING** — 这些模组由中国 1.16.2+ 速通社区自行移植，**未获 speedrun.com 官方承认**；使用它们完成的速通记录**无法通过 speedrun.com 审核**。它们是 vibe coding 的产物、属于测试版本：可能存在重大 bug，并可能影响你的速通成绩。请自行权衡后再使用。 / These mods are unofficial ports made by the Chinese 1.16.2+ speedrunning community and are not officially recognized by speedrun.com. Runs made with them will not pass speedrun.com verification. They are products of vibe coding and test builds: major bugs may exist and may affect your runs. Weigh the trade-offs before using them.
+**WARNING（警告）** — 这些模组由中国 1.16.2+ 速通社区自行移植，**未获 speedrun.com 官方承认**；使用它们完成的速通记录**无法通过 speedrun.com 审核**。它们是 vibe coding 的产物、属于测试版本：可能存在重大 bug，并可能影响你的速通成绩。请自行权衡后再使用。 / These mods are unofficial ports made by the Chinese 1.16.2+ speedrunning community and are not officially recognized by speedrun.com. Runs made with them will not pass speedrun.com verification. They are products of vibe coding and test builds: major bugs may exist and may affect your runs. Weigh the trade-offs before using them.
 
 **WARNING（显存 / VRAM）** — 队列中的每个实例都会占用一个渲染目标与显存。队列数量不要超过 6；在 2K/4K 窗口下请进一步降低，否则有爆显存（GpuOutOfMemoryException）导致游戏崩溃的风险。
 / Every queued instance owns a render target and VRAM. Keep the queue at 6 or fewer, and lower it further on 1440p/4K displays — otherwise the game may crash with a GPU out-of-memory error.
@@ -14,10 +14,10 @@
 
 | 模组 / Mod | 版本 / Version | 说明 / Description |
 | --- | --- | --- |
-| SeedQueue | `0.9.0-rc.2-disabled-benchmark.1+26.3` | 后台生成世界 + 墙界面预览 / Background world generation + wall previews |
+| SeedQueue | `0.9.0-rc.2-disabled-benchmark.166+26.3` | 后台生成世界 + 墙界面预览 / Background world generation + wall previews |
 | WorldPreview | `6.3.0-rc.1-build.1+26.3` | 预览渲染管线 / Preview rendering pipeline |
-| SpeedrunAPI | `2.1.0-rc.1-disabled-benchmark.1+26.3` | 配置界面框架 / Config screen framework |
-| StandardSettings | `2.3.0-rc.1-build.1+26.3` | 进世界应用预设选项 / Applies preset options on world join |
+| SpeedrunAPI | `2.1.0-rc.1-disabled-benchmark.23+26.3` | 配置界面框架 / Config screen framework |
+| StandardSettings | `2.3.0-rc.1-build.6+26.3` | 进世界应用预设选项 / Applies preset options on world join |
 | Atum | `1.4.0-rc.1-build.1+26.3` | 自动重置 / Auto reset |
 | FastReset | `1.6.0-rc.1-build.1+26.3` | 秒退到标题 / Instant quit to title |
 
@@ -69,6 +69,26 @@
    / Not fixed: queued instances occasionally show terrain flickering
 4. 跑分功能有重大 bug，已暂时停用（按键与选项保留并附警告）
    / Benchmarking has a major bug and is disabled for now (the key and option remain, with a warning)
+
+## 开发技术难点 / Engineering challenges
+
+- **多整合服务端共存**：SeedQueue 会同时运行多个 IntegratedServer，每个都有独立的注册表（registry）。跨服务端的物品/伤害类型引用无法编码，曾导致 `damage_event` 发包失败直接把玩家踢下线；解决方式是在发送前按当前服务端注册表校验并丢弃非法包。
+  / **Multiple integrated servers**: SeedQueue runs several IntegratedServers, each with its own registries. Cross-server holders cannot be encoded, which made `damage_event` fail and disconnect the player; packets are now validated against the current server's registry and dropped when invalid.
+
+- **渲染目标与显存**：每个队列实例需要一张窗口分辨率的渲染目标（2K 下约 20 MB）。最初这些目标在丢弃实例时从未释放，累计数 GB 后 Sodium 申请 256 MiB arena 失败而崩溃；且 `destroyBuffers()` 必须在渲染线程调用（在准备线程调用会抛 "Rendersystem called from wrong thread"，等于没释放）。
+  / **Render targets and VRAM**: every instance needs a window-sized render target (~20 MB at 1440p). They were never freed on discard, so after a few hundred resets Sodium could not allocate its 256 MiB arena. `destroyBuffers()` also has to run on the render thread — calling it from the prepare thread throws and frees nothing.
+
+- **预览区块完整性**：预览世界由生成阶段抓取的区块包构建，而生成循环会漏掉某一条边（有时是 x，有时是 z），导致卡片边缘出现黑带。修复是在服务端冻结前对**外圈四边**强制补齐，并校验快照数量。
+  / **Preview completeness**: the preview level is built from chunk packets captured while generating, and the loop could miss one edge (sometimes x, sometimes z), which showed as a black band. The fix force-generates all four edges before the server is parked and verifies the snapshot size.
+
+- **26.3 渲染管线（frame graph）**：把预览直接渲染进小尺寸卡片目标会绕过帧图绑定，表现为卡片全黑并崩溃；`copyColorFrom` 又不做缩放，缩尺寸只会裁剪。最终只能保持目标为窗口尺寸。
+  / **26.3 frame graph**: rendering previews straight into a smaller card target bypasses the frame-graph binding (black cards + crash), while `copyColorFrom` does not scale (it crops). The target therefore has to stay window-sized.
+
+- **SDL3 换库的输入差异**：26.3 改用 SDL3 后，键位名称与键码不再一一对应。曾把键位按数字序列化，鼠标键（负值）被当成键盘键重建，导致游戏内所有鼠标绑定失效；现在仍按名称存取，并对配置做校验。
+  / **SDL3 input differences**: key names no longer map one-to-one to codes. Serialising keys numerically recreated mouse keys (negative codes) as keyboard keys and broke every mouse binding; storage stays name-based with validation.
+
+- **退出流程**：Sodium/WorldPreview 内部有未关闭的非守护线程池，进程无法自然结束；现在 watchdog 在清理前启动、清理放到后台线程，4 秒内结束进程。
+  / **Shutdown**: Sodium/WorldPreview keep non-daemon pools alive, so the process never ends on its own. The watchdog now arms before teardown, which runs on a background thread and ends the process within 4 seconds.
 
 ## 安装 / Install
 

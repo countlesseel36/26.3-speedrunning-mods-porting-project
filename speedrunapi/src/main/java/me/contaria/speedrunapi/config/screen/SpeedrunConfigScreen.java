@@ -59,8 +59,29 @@ public class SpeedrunConfigScreen extends Screen {
                // Options that belong to the same vanilla screen (video / accessibility / chat ...) must
                // stay together: sorting by the bucket name before the id keeps the groups contiguous
                // instead of scattering them by hash order.
-               .thenComparing(entry -> entry.getValue().getID().endsWith("debug.overlay") ? "" : entry.getKey())
+               .thenComparing(entry -> {
+                  String id = entry.getValue().getID();
+
+                  // Key bindings keep their insertion order (vanilla registration order); comparing ids
+                  // sorted them alphabetically, which is why the list did not match the vanilla screen.
+                  if (id.startsWith("key_") || id.startsWith("key.") || id.endsWith("debug.overlay")
+                     || "speedrunapi.group.debug".equals(groupKey(entry.getValue()))) {
+                     return "";   // 键位与调试项都保留注册顺序（与原版控制页 / F3 一致）
+                  }
+
+                  return entry.getKey();
+               })
          );
+
+         if (!groupLogged) {
+            groupLogged = true;   // 每次启动首次打开配置页时打印一次，无需额外参数
+            for (Map.Entry<String, SpeedrunOption<?>> entry : entries) {
+               me.contaria.speedrunapi.SpeedrunAPI.LOGGER.info(
+                  "[speedrunapi] {} -> {} (category={})",
+                  entry.getValue().getID(), groupKey(entry.getValue()), entry.getValue().getCategory()
+               );
+            }
+         }
 
          for (Map.Entry<String, SpeedrunOption<?>> entry : entries) {
             if (!entry.getValue().hasWidget()) {
@@ -133,15 +154,17 @@ public class SpeedrunConfigScreen extends Screen {
    }
 
    /** Readable headings for the grouped vanilla buckets. */
+   private static boolean groupLogged;
+
    private static final java.util.Map<String, String> BUCKET_TITLES = java.util.Map.ofEntries(
-      java.util.Map.entry("zz.controls", "speedrunapi.group.zz_controls"),
-      java.util.Map.entry("zz.sound", "speedrunapi.group.zz_sound"),
-      java.util.Map.entry("zz.video", "speedrunapi.group.zz_video"),
-      java.util.Map.entry("zz.chat", "speedrunapi.group.zz_chat"),
-      java.util.Map.entry("zz.mouse", "speedrunapi.group.zz_mouse"),
-      java.util.Map.entry("zz.skin", "speedrunapi.group.zz_skin"),
-      java.util.Map.entry("zz.accessibility", "speedrunapi.group.zz_accessibility"),
-      java.util.Map.entry("zz.debug", "speedrunapi.group.zz_debug"),
+      java.util.Map.entry("zz.controls", "speedrunapi.group.controls"),
+      java.util.Map.entry("zz.sound", "speedrunapi.group.sound"),
+      java.util.Map.entry("zz.video", "speedrunapi.group.video"),
+      java.util.Map.entry("zz.chat", "speedrunapi.group.chat"),
+      java.util.Map.entry("zz.mouse", "speedrunapi.group.mouse"),
+      java.util.Map.entry("zz.skin", "speedrunapi.group.skin"),
+      java.util.Map.entry("zz.accessibility", "speedrunapi.group.accessibility"),
+      java.util.Map.entry("zz.debug", "speedrunapi.group.debug"),
       java.util.Map.entry("queue", "speedrunapi.group.queue"),
       java.util.Map.entry("wall", "speedrunapi.group.wall"),
       java.util.Map.entry("performance", "speedrunapi.group.performance"),
@@ -151,7 +174,16 @@ public class SpeedrunConfigScreen extends Screen {
       java.util.Map.entry("debug", "speedrunapi.group.debug"),
       java.util.Map.entry("f3", "speedrunapi.group.f3"),
       java.util.Map.entry("more", "speedrunapi.group.more"),
-      java.util.Map.entry("onWorldJoin", "speedrunapi.group.onWorldJoin")
+      java.util.Map.entry("onWorldJoin", "speedrunapi.group.onWorldJoin"),
+      java.util.Map.entry("menu.options", "speedrunapi.group.vanillaOptions"),
+      java.util.Map.entry("options.lang", "speedrunapi.group.vanillaLanguage"),
+      java.util.Map.entry("options.online", "speedrunapi.group.vanillaOnline"),
+      java.util.Map.entry("options.telemetry", "speedrunapi.group.vanillaTelemetry"),
+      java.util.Map.entry("options.chat", "speedrunapi.group.chat"),
+      java.util.Map.entry("options.mouse", "speedrunapi.group.mouse"),
+      java.util.Map.entry("options.sound", "speedrunapi.group.sound"),
+      java.util.Map.entry("options.video", "speedrunapi.group.video"),
+      java.util.Map.entry("options.accessibility", "speedrunapi.group.accessibility")
    );
 
    /**
@@ -167,56 +199,6 @@ public class SpeedrunConfigScreen extends Screen {
       return net.minecraft.locale.Language.getInstance().getOrDefault(key);
    }
 
-   private static String groupTitle(SpeedrunOption<?> option) {
-      String category = option.getCategory();
-
-      if (category != null && !category.isBlank()) {
-         return bucketTitle(category);
-      }
-
-      String id = option.getID().toLowerCase(java.util.Locale.ROOT);
-
-      if (id.startsWith("key_") || id.startsWith("key.")) {
-         return groupLabel("按键控制", "speedrunapi.group.controls");
-      }
-
-      if (id.contains("sound") || id.contains("music") || id.contains("volume")) {
-         return groupLabel("声音设置", "speedrunapi.group.sound");
-      }
-
-      if (id.contains("chat") || id.contains("narrat") || id.contains("notification")) {
-         return groupLabel("聊天设置", "speedrunapi.group.chat");
-      }
-
-      if (id.contains("mouse") || id.contains("invert") || id.contains("sensitivity")) {
-         return groupLabel("鼠标设置", "speedrunapi.group.mouse");
-      }
-
-      if (id.contains("modelpart") || id.contains("cape") || id.contains("skin")) {
-         return groupLabel("皮肤设置", "speedrunapi.group.skin");
-      }
-
-      if (id.contains("debug") || id.contains("hitbox") || id.contains("chunk")) {
-         return groupLabel("调试选项", "speedrunapi.group.debug");
-      }
-
-      if (id.contains("fov") || id.contains("render") || id.contains("graphic") || id.contains("gui")
-         || id.contains("gamma") || id.contains("cloud") || id.contains("particles")
-         || id.contains("mipmap") || id.contains("vsync") || id.contains("fullscreen")
-         || id.contains("anisotropy") || id.contains("fps") || id.contains("simulation")
-         || id.contains("ao") || id.contains("biomeblend")) {
-         return groupLabel("视频设置", "speedrunapi.group.video");
-      }
-
-      return groupLabel("杂项", "speedrunapi.group.misc");
-   }
-
-   private static final java.util.List<String> GROUP_ORDER = java.util.List.of(
-      "队列选项", "墙界面选项", "性能选项", "进阶选项", "线程选项", "实验选项",
-      "按键控制", "视频设置", "聊天设置", "声音设置", "鼠标设置", "皮肤设置",
-      "辅助功能设置", "F3 设置", "进入世界时设置", "更多设置", "杂项", "调试选项"
-   );
-
    /**
     * Options that control the whole config (StandardSettings' "toggle all" and "use StandardSettings")
     * belong at the top of the page, not at the bottom of the misc group.
@@ -224,15 +206,130 @@ public class SpeedrunConfigScreen extends Screen {
    private static int optionPriority(SpeedrunOption<?> option) {
       String id = option.getID();
 
-      if (id.equals("toggleAll") || id.equals("useStandardSettings")) {
+      if (id.equals("toggleStandardSettings")) {
+         return -2;   // 放在最顶部
+      }
+
+      if (id.equals("toggleAll")) {
          return -1;
       }
 
       return 0;
    }
 
+   /** Canonical, language-independent group key used for ordering and translation. */
+   private static String groupKey(SpeedrunOption<?> option) {
+      // Debug render toggles must be checked *before* the category mapping: they carry a vanilla
+      // category (video/misc) whose bucket would otherwise win and split them away from the F3 entries.
+      String debugId = option.getID().toLowerCase(java.util.Locale.ROOT);
+
+      // 全局设置：置顶，包含"全部切换 / 使用 StandardSettings / 进世界时暂停 / 首次进世界暂停延迟"
+      // Real ids from the diagnostics: toggleAll / toggleStandardSettings (there is no "useStandardSettings").
+      // "进世界时暂停" / "首次进世界暂停延迟" 的真实 id 是 autoF3Esc / firstAutoF3EscDelay
+      boolean joinPause = debugId.contains("autof3esc");
+      boolean pieOrFov = debugId.contains("pie") || debugId.contains("fov");
+      boolean globalToggle = debugId.equals("toggleall") || debugId.equals("togglestandardsettings")
+         || joinPause;
+      boolean worldJoinPause = !debugId.startsWith("key_") && !debugId.startsWith("key.")
+         && debugId.contains("pause") && !debugId.contains("focus");
+
+      // 进世界时暂停 / 首次进世界暂停延迟 → 进入世界时设置
+      if (joinPause) {
+         return "speedrunapi.group.onWorldJoin";
+      }
+
+      // "进世界时视场角"(fovOnWorldJoin) 属于进入世界时设置；"视场角"(fov) 留在全局设置
+      if (debugId.contains("fov") && debugId.contains("worldjoin")) {
+         return "speedrunapi.group.onWorldJoin";
+      }
+
+      if (globalToggle || worldJoinPause || pieOrFov) {
+         return "speedrunapi.group.global";
+      }
+
+      // Key bindings come first: "key.debug.showHitboxes" / "...chunkBorders" are rebindable controls,
+      // not debug toggles.
+      if (debugId.startsWith("key_") || debugId.startsWith("key.")) {
+         return "speedrunapi.group.controls";
+      }
+
+      // Requested grouping: FOV, server listing, Realms notifications, telemetry, pie directory and the
+      // world-join pause options live in the misc group.
+      if (debugId.contains("serverlisting") || debugId.contains("server_listing")
+         || debugId.contains("realms") || debugId.contains("telemetry")) {
+         return "speedrunapi.group.misc";
+      }
+
+      // Chunk fade belongs to video, not debug.
+      if (debugId.contains("fade")) {
+         return "speedrunapi.group.video";
+      }
+
+      if (debugId.contains("crosshair") || debugId.contains("hitbox") || debugId.contains("section")
+         || debugId.contains("octree") || debugId.contains("border") || debugId.contains("visualize")
+         || debugId.contains("debug.chunk") || debugId.contains("chunk_section")) {
+         return "speedrunapi.group.debug";
+      }
+
+      String category = option.getCategory();
+
+      if (category != null && !category.isBlank()) {
+         String key = BUCKET_TITLES.get(categoryBucket(category));
+
+         if (key == null) {
+            key = BUCKET_TITLES.get(category);
+         }
+
+         if (key != null) {
+            return key;
+         }
+      }
+
+      String id = option.getID().toLowerCase(java.util.Locale.ROOT);
+
+      if (id.startsWith("key_") || id.startsWith("key.")) return "speedrunapi.group.controls";
+      if (id.contains("sound") || id.contains("music") || id.contains("volume")) return "speedrunapi.group.sound";
+      if (id.contains("chat") || id.contains("narrat") || id.contains("notification")) return "speedrunapi.group.chat";
+      if (id.contains("mouse") || id.contains("invert") || id.contains("sensitivity")) return "speedrunapi.group.mouse";
+      if (id.contains("modelpart") || id.contains("cape") || id.contains("skin")) return "speedrunapi.group.skin";
+      // Debug *render* toggles (crosshair / chunk borders / section overlays / hitboxes) belong next to
+      // the F3 screen entries, not in video or misc.
+      if (id.contains("debug") || id.contains("hitbox")
+         || id.contains("crosshair") || id.contains("section") || id.contains("octree")
+         || id.contains("border") || id.contains("overlay")) {
+         return "speedrunapi.group.debug";
+      }
+
+      if (id.contains("fov") || id.contains("render") || id.contains("graphic") || id.contains("gui")
+         || id.contains("gamma") || id.contains("cloud") || id.contains("particles")
+         || id.contains("mipmap") || id.contains("vsync") || id.contains("fullscreen")
+         || id.contains("anisotropy") || id.contains("fps") || id.contains("simulation")
+         || id.contains("ao") || id.contains("biomeblend")) {
+         return "speedrunapi.group.video";
+      }
+
+      return "speedrunapi.group.misc";
+   }
+
+   private static String groupTitle(SpeedrunOption<?> option) {
+      String category = option.getCategory();
+
+      // Always go through the same key: a second code path produced the duplicated "调试选项" heading.
+      return net.minecraft.locale.Language.getInstance().getOrDefault(groupKey(option));
+   }
+
+   /** Order of the groups, as language-independent keys (matches the English page order). */
+   private static final java.util.List<String> GROUP_ORDER = java.util.List.of(
+      "speedrunapi.group.global", "speedrunapi.group.queue", "speedrunapi.group.wall", "speedrunapi.group.performance",
+      "speedrunapi.group.advanced", "speedrunapi.group.threading", "speedrunapi.group.experimental",
+      "speedrunapi.group.controls", "speedrunapi.group.video", "speedrunapi.group.chat",
+      "speedrunapi.group.sound", "speedrunapi.group.mouse", "speedrunapi.group.skin",
+      "speedrunapi.group.accessibility", "speedrunapi.group.f3", "speedrunapi.group.onWorldJoin",
+      "speedrunapi.group.more", "speedrunapi.group.misc", "speedrunapi.group.debug"
+   );
+
    private static int groupIndex(SpeedrunOption<?> option) {
-      int index = GROUP_ORDER.indexOf(groupTitle(option));
+      int index = GROUP_ORDER.indexOf(groupKey(option));
       return index < 0 ? GROUP_ORDER.size() : index;
    }
 
@@ -638,10 +735,6 @@ public class SpeedrunConfigScreen extends Screen {
       // Always show the group of the first visible row in the left column, at a fixed height inside
       // the clipped list area. This is the same draw path the option names use, so it is guaranteed
       // to be visible (previous attempts placed it above the first row, where the title band covered it).
-      if (firstVisible < this.shownOptions.size()) {
-         graphics.text(this.font, groupTitle(this.shownOptions.get(firstVisible)), this.width / 2 - 170, 40, 0xFFFFFF55);
-      }
-
       for (int i = 0; i < this.shownOptions.size(); i++) {
          SpeedrunOption<?> option = this.shownOptions.get(i);
          String category = option.getCategory();
@@ -728,13 +821,14 @@ public class SpeedrunConfigScreen extends Screen {
             );
          }
 
-         if (i == 0 || !groupTitle(this.shownOptions.get(i - 1)).equals(group)) {
+         if (i == 0 || !groupTitle(this.shownOptions.get(i - 1)).trim().equals(group.trim())) {
             // Drawn on the same line as the first option of the group, in the left column, so it is
             // always inside the visible list area.
-            graphics.text(this.font, group, this.width / 2 - 170, this.rowY(i) + 6, 0xFFFFFF55);
+            graphics.text(this.font, group, this.width / 2 - 210, this.rowY(i) + 6, 0xFFFFFF55);
          }
 
-         graphics.text(this.font, name, labelRight - this.font.width(name), y, -1);
+         boolean topRow = option.getID().equals("toggleStandardSettings");
+         graphics.text(this.font, name, labelRight - this.font.width(name), y, topRow ? 0xFFFFFF55 : -1);
       }
    }
 

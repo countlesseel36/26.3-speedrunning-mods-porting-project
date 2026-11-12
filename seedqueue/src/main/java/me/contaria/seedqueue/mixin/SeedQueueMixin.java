@@ -27,6 +27,14 @@ public class SeedQueueMixin {
       SeedQueue.renderInstances((Minecraft) (Object) this);
    }
 
+   @Inject(method = "close", at = @At("HEAD"), require = 0)
+   private void seedqueue$saveOnClose(CallbackInfo ci) {
+      try {
+         SeedQueue.saveAllSettings();
+      } catch (Throwable ignored) {
+      }
+   }
+
    @Inject(method = "close", at = @At("HEAD"))
    private void seedqueue$close(CallbackInfo ci) {
       SeedQueue.shutdown();

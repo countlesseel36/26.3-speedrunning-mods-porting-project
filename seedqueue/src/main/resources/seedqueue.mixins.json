@@ -31,7 +31,8 @@
     "sodium.ChunkMeshBufferBuilderMixin",
     "sodium.ChunkJobResultMixin",
     "sodium.SodiumRenderLayerMixin",
-    "sodium.UniformBufferAccessor"
+    "sodium.UniformBufferAccessor",
+    "DamagePacketGuardMixin"
   ],
   "injectors": {
     "defaultRequire": 1

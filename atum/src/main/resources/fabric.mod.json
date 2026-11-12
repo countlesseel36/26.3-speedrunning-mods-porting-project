@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "atum",
-  "version": "1.4.0-rc.1-build.1+26.3",
+  "version": "1.4.0-rc.1-build.2+26.3",
   "name": "Atum",
   "description": "Automatically resets RSG and SSG. Ported to Minecraft 26.3 by the Chinese 1.16.2+ speedrunning community.",
   "authors": [

@@ -99,3 +99,5 @@ Copy-Item "dist\past-build\SeedQueue\0.9.0-rc.27+26.3-SeedQueue.jar" $mods -Forc
 | 2026-11-09 | SeedQueue | `0.9.0-rc.1-disabled-benchmark.2+26.3` | 外圈四边强制补区块（压测 189/189、后续 225/225 通过） | `dist/` |
 | 2026-11-09 | SeedQueue | `0.9.0-rc.1-disabled-benchmark.3+26.3` | 退出修复：watchdog 提前启动 + 后台清理；v0.3.0 发布构建 | `dist/` |
 | 2026-11-10 | SeedQueue | `0.9.0-rc.2-disabled-benchmark.1+26.3` | 显存泄漏重大修复（渲染目标释放 + 渲染线程销毁）；暂停界面 F6 回墙；v0.3.1 发布构建 | `dist/` |
+| 2026-11-10 | 归档 / archive | — | 将 `dist/` 中 rc.1-disabled-benchmark.1–.10 等 10 个历史 SeedQueue 构建移入 `dist/past-build/SeedQueue/`；根目录只保留 6 个当前发布 jar | `dist/past-build/` |
+| 2026-11-12 | SeedQueue / SpeedrunAPI / StandardSettings | `0.9.0-rc.2-disabled-benchmark.16` / `2.1.0-rc.1-disabled-benchmark.23` / `2.3.0-rc.1-build.6` | v0.3.2 发布构建：分组/排序修正、鼠标键修复、显存泄漏修复 | `dist/` |

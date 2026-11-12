@@ -31,5 +31,12 @@
   "speedrunapi.group.chat": "聊天设置",
   "speedrunapi.group.mouse": "鼠标设置",
   "speedrunapi.group.skin": "皮肤设置",
-  "speedrunapi.group.video": "视频设置"
+  "speedrunapi.group.video": "视频设置",
+  "speedrunapi.config.seedqueue.benchmarkWarning": "跑分功能因未修复的重大 bug 已停用（按键与选项仅作占位）。",
+  "speedrunapi.group.vanillaOptions": "原版选项",
+  "speedrunapi.group.vanillaLanguage": "语言选项",
+  "speedrunapi.group.vanillaOnline": "联机选项",
+  "speedrunapi.group.vanillaTelemetry": "遥测选项",
+  "speedrunapi.group.global": "全局设置",
+  "speedrunapi.group.accessibility": "辅助功能设置"
 }

@@ -291,8 +291,9 @@ public class StandardSettingsConfig implements SpeedrunConfig {
       this.register("autoJump", "options.controls", options.autoJump());
       this.register("sprintWindow", "options.controls", options.sprintWindow());
       this.register("operatorItemsTab", "options.controls", options.operatorItemsTab());
+      // Keep vanilla's registration order: the controls screen lists categories in registration order,
+      // and sorting here made StandardSettings' key list diverge from it.
       KeyMapping[] keyBindings = (KeyMapping[])ArrayUtils.clone(Minecraft.getInstance().options.keyMappings);
-      Arrays.sort(keyBindings);
 
       for (KeyMapping keyBinding : keyBindings) {
          this.register(new KeyBindingStandardSetting("key_" + keyBinding.getName(), keyBinding.getCategory().id().toLanguageKey("key.category"), keyBinding));

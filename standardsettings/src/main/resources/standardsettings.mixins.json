@@ -12,9 +12,9 @@
     "accessors.OptionListAccessor",
     "accessors.PieChartAccessor",
     "accessors.SimpleOptionAccessor",
-    
     "fix.LanguageSelectionListMixin",
-    "fix.LanguageSelectScreenMixin"
+    "fix.LanguageSelectScreenMixin",
+    "KeyMappingAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

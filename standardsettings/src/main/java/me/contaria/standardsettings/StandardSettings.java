@@ -106,8 +106,9 @@ public class StandardSettings {
          languageManager.onResourceManagerReload(client.getResourceManager());
       }
 
-      // Every join used to walk the option list; skip the whole pass unless a join is pending.
-      boolean applied = guiScaleChanged;
+      // Persist every applied option: without this the values only lived in memory, so toggles like
+      // sprint-toggled were back to their old state on the next launch ("have to re-enable it every time").
+      boolean applied = true;
 
       if (applied) {
          KeyMapping.resetMapping();

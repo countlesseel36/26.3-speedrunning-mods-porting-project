@@ -308,6 +308,16 @@ public final class SeedQueue implements ClientModInitializer {
    /** True once the client is exiting: GPU work must be skipped, the context is going away. */
    public static volatile boolean shuttingDown;
 
+   /** Writes the SeedQueue config (including wall keys) to disk before the client closes. */
+   public static void saveAllSettings() {
+      try {
+         QueueConfig.save();
+         LOGGER.info("[seedqueue] settings saved on shutdown");
+      } catch (Throwable t) {
+         LOGGER.warn("[seedqueue] failed to save settings on shutdown", t);
+      }
+   }
+
    public static void shutdown() {
       // Arm the watchdog *first*: halting hundreds of queued servers can take far longer than 4s, and
       // while this loop runs the old code had not started the watchdog yet, so the window froze with
@@ -315,7 +325,17 @@ public final class SeedQueue implements ClientModInitializer {
       startExitWatchdog();
 
       shuttingDown = true;
-      for (QueueEntry entry : new ArrayList<>(ENTRIES)) {
+
+      // Quitting while inside a world: vanilla closes the joined server itself. Halting it here made
+      // the client see its connection disappear and show "Connection Lost / server not connected".
+      // Skip the teardown in that case and let the watchdog end the process.
+      boolean inWorld = net.minecraft.client.Minecraft.getInstance().level != null;
+
+      for (QueueEntry entry : inWorld ? new ArrayList<QueueEntry>() : new ArrayList<>(ENTRIES)) {
+         // Never halt the world the player is actually in.
+         if (entry.selected || entry.transferred || entry == liveEntry) {
+            continue;
+         }
          // Wake and halt the background server first: its thread is not a daemon, so a parked server
          // kept the JVM alive after the window closed (the exit watchdog then had to kill the process).
          try {
@@ -1111,6 +1131,58 @@ public final class SeedQueue implements ClientModInitializer {
     *
     * @return true when the key press was handled
     */
+   /**
+    * True when every entity referenced by a damage packet still exists in the player's level.
+    *
+    * <p>{@code writeOptionalEntityId} encodes "no entity" as 0, so only non-zero ids are resolved. A
+    * non-zero id that no longer maps to an entity is what makes the packet fail to encode and drops the
+    * connection.</p>
+    */
+   public static boolean isDamagePayloadValid(net.minecraft.server.level.ServerPlayer player, int entityId, int causeId, int directId) {
+      if (player == null) {
+         return false;
+      }
+
+      net.minecraft.server.level.ServerLevel level = player.level();
+
+      if (entityId != 0 && level.getEntity(entityId) == null) {
+         return false;
+      }
+
+      if (causeId != 0 && level.getEntity(causeId) == null) {
+         return false;
+      }
+
+      return directId == 0 || level.getEntity(directId) != null;
+   }
+
+   /**
+    * True when the packet's damage type exists in this server's registries.
+    *
+    * <p>The holder carries a valid key even when it was created by another integrated server, so the key
+    * has to be looked up in the current server's registry — otherwise the packet cannot be encoded.</p>
+    */
+   public static boolean isDamageTypeRegistered(net.minecraft.server.MinecraftServer server,
+      net.minecraft.network.protocol.game.ClientboundDamageEventPacket damage) {
+      try {
+         var key = damage.sourceType().unwrapKey();
+
+         if (key.isEmpty()) {
+            return false;
+         }
+
+         return server.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE)
+            .containsKey(key.get());
+      } catch (Throwable t) {
+         return false;
+      }
+   }
+
+   /** The entry whose world the player is currently in, if any. */
+   public static QueueEntry liveEntry() {
+      return liveEntry;
+   }
+
    /** Set while a wall return is waiting for the client to finish leaving the world. */
    private static boolean pendingWallReturn;
    private static int wallReturnTicks;
@@ -3312,7 +3384,7 @@ public final class SeedQueue implements ClientModInitializer {
       java.util.List<QueueEntry> candidates = new java.util.ArrayList<>();
 
       for (QueueEntry entry : ENTRIES) {
-         if (entry.parked) {
+         if (entry.parked && !entry.selected && !entry.transferred && entry != liveEntry) {
             candidates.add(entry);
          }
       }

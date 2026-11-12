@@ -47,7 +47,13 @@ public class DebugStandardSetting extends StandardSetting<DebugScreenEntryStatus
    }
 
    public Component getName() {
-      return Component.literal(this.id.getPath());
+      // Debug entries have no translated name in this port; show the vanilla-style name where one
+      // exists and fall back to the identifier path ("biome", "chunk_generation_stats", ...).
+      String path = this.id.getPath();
+      String key = "debug." + path;
+      String translated = net.minecraft.locale.Language.getInstance().getOrDefault(key);
+
+      return Component.literal(translated.equals(key) ? path : translated);
    }
 
    @Override
