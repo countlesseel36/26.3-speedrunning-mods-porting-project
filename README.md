@@ -93,6 +93,15 @@
 3. 首次启动生成 `config/seedqueue.json` 与 `config/mcsr/` 配置
    / The first launch creates `config/seedqueue.json` and the files under `config/mcsr/`
 
+## 调试参数 / Debug parameters
+
+所有 `-Dseedqueue.*` 启动参数（跑分、预览、日志、行为开关、冒烟测试）按分类整理在：
+
+**[docs/debug-parameters.md](docs/debug-parameters.md)**
+
+所有参数均为测试用途，随时可能增删，不做兼容承诺；排查完请移除。
+/ All `-Dseedqueue.*` flags are test-only, may change without notice; remove them after debugging.
+
 ## 构建 / Build
 
 ```powershell
