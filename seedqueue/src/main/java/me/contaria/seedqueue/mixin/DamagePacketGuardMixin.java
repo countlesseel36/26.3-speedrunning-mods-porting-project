@@ -25,6 +25,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(ServerCommonPacketListenerImpl.class)
 public abstract class DamagePacketGuardMixin {
+   /** 已知无法安全编码的伤害类型（缺 id 会直接踢人）。 */
+   private static final java.util.Set<String> UNSAFE_DAMAGE_TYPES = java.util.Set.of("spear");
+
    private static final ThreadLocal<Boolean> REMAPPING = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
    @Shadow
@@ -40,6 +43,14 @@ public abstract class DamagePacketGuardMixin {
 
       // 实测编码用的注册表与 server / client 世界两套注册表都对不上（minecraft:spear 一直漏网），
       // 因此统一改写成每个注册表都必然存在的 minecraft:generic。
+      // 黑名单：只有这些类型的 id 不在连接的注册表里，编码必然失败（实测为矛）。
+      // 其余类型一律原样发送，保留各自的专属音效。
+      String path = damage.sourceType().unwrapKey().map(k -> k.identifier().getPath()).orElse("");
+
+      if (!UNSAFE_DAMAGE_TYPES.contains(path)) {
+         return;
+      }
+
       var generic = this.server.registryAccess()
          .lookupOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE)
          .get(net.minecraft.resources.ResourceKey.create(

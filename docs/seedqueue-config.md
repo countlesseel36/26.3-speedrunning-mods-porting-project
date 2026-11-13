@@ -1,6 +1,6 @@
 # SeedQueue 配置项说明 / SeedQueue configuration reference
 
-> 对应 SeedQueue `1.0.0-rc.2+`（26.3 移植版）。配置文件：`config/mcsr/seedqueue.json`。
+> 对应 SeedQueue `1.0.0-rc.3+`（26.3 移植版）。配置文件：`config/mcsr/seedqueue.json`。
 > 分类与顺序与游戏内 **SeedQueue 配置页** 一致。
 
 ## Queue（队列）
