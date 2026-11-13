@@ -1181,6 +1181,9 @@ public final class SeedQueue implements ClientModInitializer {
       return entry != null ? entry.server() : null;
    }
 
+   /** 进入世界时客户端注册表里的伤害类型集合（连接真正同步过的快照）。 */
+   private static java.util.Set<net.minecraft.resources.ResourceKey<?>> syncedDamageTypes;
+
    public static boolean isDamageTypeRegistered(net.minecraft.server.MinecraftServer server,
       net.minecraft.network.protocol.game.ClientboundDamageEventPacket damage) {
       try {
@@ -1190,8 +1193,23 @@ public final class SeedQueue implements ClientModInitializer {
             return false;
          }
 
-         return server.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE)
+         // 服务端注册表里存在还不够：编码用的是"这条连接同步给客户端的注册表"。
+         // 当前世界的注册表就是那份快照，缺条目时发出去必然 EncoderException 并踢人。
+         boolean serverHas = server.registryAccess()
+            .lookupOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE)
             .containsKey(key.get());
+
+         if (!serverHas) {
+            return false;
+         }
+
+         // 用"进入世界时抓取的快照"判断：客户端注册表之后可能被动态追加（例如矛），
+         // 但连接编码用的 id 表仍是登录时那份，后追加的条目依然编码失败。
+         if (syncedDamageTypes != null && !syncedDamageTypes.contains(key.get())) {
+            return false;
+         }
+
+         return true;
       } catch (Throwable t) {
          return false;
       }
@@ -2266,6 +2284,19 @@ public final class SeedQueue implements ClientModInitializer {
 
       // Benchmark keeps running outside the wall: the overlay is not a WallScreen, so the
       // wall-driven update would stop and the reset loop would stall.
+      if (minecraft.level != null && syncedDamageTypes == null) {
+         try {
+            syncedDamageTypes = minecraft.level.registryAccess()
+               .lookupOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE)
+               .registryKeySet()
+               .stream()
+               .map(k -> (net.minecraft.resources.ResourceKey<?>) k)
+               .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            LOGGER.info("[seedqueue] captured {} synced damage types", syncedDamageTypes.size());
+         } catch (Throwable ignored) {
+         }
+      }
+
       if (benchmarking) {
          wallScheduledTick(minecraft);
       }

@@ -25,6 +25,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(ServerCommonPacketListenerImpl.class)
 public abstract class DamagePacketGuardMixin {
+   private static final ThreadLocal<Boolean> REMAPPING = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
    @Shadow
    @Final
    protected MinecraftServer server;
@@ -35,19 +37,58 @@ public abstract class DamagePacketGuardMixin {
          return;
       }
 
-      // 队列里的其它服务端与当前连接不是同一套注册表：它们的伤害事件永远无法编码。
-      // 只有玩家真正所在的服务端才允许发送该包（实测 minecraft:spear 绕过了注册表检查）。
-      net.minecraft.server.MinecraftServer live = SeedQueue.liveServer();
 
-      if (live != null && live != this.server) {
-         SeedQueue.LOGGER.info(
-            "[seedqueue] dropped damage_event from a background server (entity={})", damage.entityId()
-         );
+      // 实测编码用的注册表与 server / client 世界两套注册表都对不上（minecraft:spear 一直漏网），
+      // 因此统一改写成每个注册表都必然存在的 minecraft:generic。
+      var generic = this.server.registryAccess()
+         .lookupOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE)
+         .get(net.minecraft.resources.ResourceKey.create(
+            net.minecraft.core.registries.Registries.DAMAGE_TYPE,
+            net.minecraft.resources.Identifier.withDefaultNamespace("generic")
+         ));
+
+      if (generic.isPresent()) {
+         if (Boolean.TRUE.equals(REMAPPING.get())) {
+            return;
+         }
+
+         REMAPPING.set(Boolean.TRUE);
+
+         try {
+            ((ServerCommonPacketListenerImpl) (Object) this).send(new ClientboundDamageEventPacket(
+               damage.entityId(),
+               generic.get(),
+               damage.sourceCauseId(),
+               damage.sourceDirectId(),
+               damage.sourcePosition()
+            ));
+         } finally {
+            REMAPPING.set(Boolean.FALSE);
+         }
+
          ci.cancel();
          return;
       }
 
       if (!SeedQueue.isDamageTypeRegistered(this.server, damage)) {
+         // 客户端注册表里没有该伤害类型（例如矛的 minecraft:spear）。
+         // 直接丢弃会丢失受击动画/音效，所以改写成客户端一定认识的 generic，其余字段保持不变。
+         if (generic.isPresent()) {
+            SeedQueue.LOGGER.info(
+               "[seedqueue] remapped damage_event to generic (entity={}, cause={})",
+               damage.entityId(), damage.sourceCauseId()
+            );
+            ((ServerCommonPacketListenerImpl) (Object) this).send(new ClientboundDamageEventPacket(
+               damage.entityId(),
+               generic.get(),
+               damage.sourceCauseId(),
+               damage.sourceDirectId(),
+               damage.sourcePosition()
+            ));
+            ci.cancel();
+            return;
+         }
+
          SeedQueue.LOGGER.warn(
             "[seedqueue] dropped damage_event with an unregistered damage type (entity={}, cause={}, direct={})",
             damage.entityId(), damage.sourceCauseId(), damage.sourceDirectId()

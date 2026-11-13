@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "seedqueue",
-  "version": "1.0.0-rc.1+26.3",
+  "version": "1.0.0-rc.2+26.3",
   "name": "SeedQueue",
   "description": "Pre-generates worlds in the background and shows them on a wall screen. 26.3 port by the Chinese 1.16.2+ speedrunning community.",
   "authors": ["contaria", "FloofX", "FiguiNL", "CountlessEel36"],
