@@ -77,6 +77,17 @@
 | --- | --- | --- |
 | Show Chunk Maps / 显示区块地图 | OFF | 在卡片上叠加区块地图（调试用）。 |
 
+## Benchmark（跑分）
+
+| 选项 | 默认 | 作用 |
+| --- | --- | --- |
+| Benchmark Resets / 跑分重置次数 | 1000 | 一次跑分执行的重置次数（1–1000）。按 B 开始，N 或 Esc 取消。 |
+| Benchmark Concurrency / 跑分并发 | 0 | 跑分期间并行构建的实例数；0 = 跟随队列容量（行×列）。 |
+| Benchmark Sample Ticks / 资源采样间隔 | 100 | 跑分期间资源采样间隔（tick）；0 = 关闭采样，100 约等于 5 秒一次。 |
+| Max Generating Count / 最大同时生成数 | 0 | 同时处于「生成中」的实例数上限；0 = 不限制。降低可减少 CPU 争抢，但可能降低吞吐（实测 2/3 与不限制差异仅 4–5%）。 |
+| Benchmark Chunk Radius / 跑分区块半径 | 2 | **仅跑分期间生效**的区块半径（1–10）。越小生成越快，卡片可见范围越小；日常刷种不受影响。 |
+
+> 历史变更：原「Miscellaneous」大类已移除。`Benchmark Resets` 归入本大类；`Check Allocated Memory`、`Chunkmap Freezing` 归入 Performance；`Chunk Progress`、`Show Debug Menu`、`Watchdog` 归入 Debug。`Chunkmap Freezing` 的滑块范围已由 500000 收紧到 10000（-1 = OFF）。
 ## 与性能的关系（实测摘要）
 
 开发机（RTX 4060 Laptop / i9-12900HX / 32 GB DDR5-4800）实测：
