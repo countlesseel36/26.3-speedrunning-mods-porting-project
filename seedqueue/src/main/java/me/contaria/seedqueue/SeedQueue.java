@@ -1175,6 +1175,12 @@ public final class SeedQueue implements ClientModInitializer {
     * <p>The holder carries a valid key even when it was created by another integrated server, so the key
     * has to be looked up in the current server's registry — otherwise the packet cannot be encoded.</p>
     */
+   /** 玩家当前真正所在世界的服务端；不在世界中时为 null。 */
+   public static net.minecraft.server.MinecraftServer liveServer() {
+      QueueEntry entry = liveEntry();
+      return entry != null ? entry.server() : null;
+   }
+
    public static boolean isDamageTypeRegistered(net.minecraft.server.MinecraftServer server,
       net.minecraft.network.protocol.game.ClientboundDamageEventPacket damage) {
       try {
@@ -3514,7 +3520,7 @@ public final class SeedQueue implements ClientModInitializer {
 
       // 跑分时需要更多实例并行构建：允许超出队列容量，用 benchmarkConcurrency 作为目标数量
       int target = benchmarking
-         ? Math.max(queueSize(), Integer.getInteger("seedqueue.benchmarkConcurrency", queueSize()))
+         ? Math.max(queueSize(), Integer.getInteger("seedqueue.benchmarkConcurrency", QueueConfig.benchmarkConcurrency > 0 ? QueueConfig.benchmarkConcurrency : queueSize()))
          : queueSize();
 
       while (occupied < target) {
@@ -3701,6 +3707,50 @@ public final class SeedQueue implements ClientModInitializer {
 
    private static long lastPlayNextLockAt;
 
+   /**
+    * 同时处于"生成中"的实例数上限（1.16.1 的 maxGeneratingCount）。
+    *
+    * <p>默认 0 表示不限制，保持现有吞吐；限制在"生成已经并行化"之后才有意义，因此这里只提供
+    * 机制，不改变默认行为。</p>
+    */
+
+   private static final Object generatingLock = new Object();
+   private static int generatingNow;
+
+   /** 等待一个生成许可；上限由 QueueConfig.maxGeneratingCount 动态决定（0 = 不限制）。 */
+   public static void acquireGeneratingPermit() {
+      synchronized (generatingLock) {
+         int limit = Integer.getInteger("seedqueue.maxGeneratingCount", QueueConfig.maxGeneratingCount);
+
+         while (limit > 0 && generatingNow >= limit) {
+            try {
+               generatingLock.wait(50L);
+            } catch (InterruptedException e) {
+               Thread.currentThread().interrupt();
+               break;
+            }
+
+            limit = Integer.getInteger("seedqueue.maxGeneratingCount", QueueConfig.maxGeneratingCount);
+         }
+
+         generatingNow++;
+      }
+   }
+
+   public static void releaseGeneratingPermit() {
+      synchronized (generatingLock) {
+         if (generatingNow > 0) {
+            generatingNow--;
+         }
+
+         generatingLock.notifyAll();
+      }
+   }
+
+   public static boolean debugTargetPool() {
+      return Boolean.getBoolean("seedqueue.targetPoolLog");
+   }
+
    private static String sodiumVersion() {
       try {
          return net.fabricmc.loader.api.FabricLoader.getInstance()
@@ -3717,7 +3767,11 @@ public final class SeedQueue implements ClientModInitializer {
 
    /** Logs heap / CPU / VRAM while a benchmark runs, so concurrency can be tuned with data. */
    private static void resourceSampleTick(Minecraft minecraft) {
-      if (++resourceSampleTicks < Integer.getInteger("seedqueue.resourceSampleTicks", 100)) {
+      int sampleEvery = QueueConfig.benchmarkSampleTicks > 0
+         ? QueueConfig.benchmarkSampleTicks
+         : Integer.getInteger("seedqueue.resourceSampleTicks", 100);
+
+      if (sampleEvery <= 0 || ++resourceSampleTicks < sampleEvery) {
          return;
       }
 
@@ -3747,7 +3801,7 @@ public final class SeedQueue implements ClientModInitializer {
 
       LOGGER.info(
          "[seedqueue] bench resources: concurrency={} entries={} heap={}/{}MB committed={}MB cpu={}% sys={}%",
-         Integer.getInteger("seedqueue.benchmarkConcurrency", Integer.getInteger("seedqueue.maxParkedServers", 8)),
+         Integer.getInteger("seedqueue.benchmarkConcurrency", QueueConfig.benchmarkConcurrency > 0 ? QueueConfig.benchmarkConcurrency : Integer.getInteger("seedqueue.maxParkedServers", 8)),
          ENTRIES.size(),
          usedHeapMb, maxHeapMb, committedMb,
          String.format("%.1f", processCpu), String.format("%.1f", systemCpu)
@@ -3777,7 +3831,7 @@ public final class SeedQueue implements ClientModInitializer {
          Minecraft.getInstance().getWindow().getHeight(),
          queueSize(),
          QueueConfig.maxWorldGenerationPercentage,
-         Integer.getInteger("seedqueue.benchmarkConcurrency", queueSize()),
+         Integer.getInteger("seedqueue.benchmarkConcurrency", QueueConfig.benchmarkConcurrency > 0 ? QueueConfig.benchmarkConcurrency : queueSize()),
          sodiumVersion()
       );
       LOGGER.info("[seedqueue] benchmark started ({} resets)", Integer.getInteger("seedqueue.benchmarkResets", QueueConfig.benchmarkResets));

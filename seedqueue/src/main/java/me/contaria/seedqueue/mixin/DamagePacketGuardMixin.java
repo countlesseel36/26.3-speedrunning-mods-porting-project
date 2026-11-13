@@ -35,6 +35,18 @@ public abstract class DamagePacketGuardMixin {
          return;
       }
 
+      // 队列里的其它服务端与当前连接不是同一套注册表：它们的伤害事件永远无法编码。
+      // 只有玩家真正所在的服务端才允许发送该包（实测 minecraft:spear 绕过了注册表检查）。
+      net.minecraft.server.MinecraftServer live = SeedQueue.liveServer();
+
+      if (live != null && live != this.server) {
+         SeedQueue.LOGGER.info(
+            "[seedqueue] dropped damage_event from a background server (entity={})", damage.entityId()
+         );
+         ci.cancel();
+         return;
+      }
+
       if (!SeedQueue.isDamageTypeRegistered(this.server, damage)) {
          SeedQueue.LOGGER.warn(
             "[seedqueue] dropped damage_event with an unregistered damage type (entity={}, cause={}, direct={})",

@@ -55,6 +55,25 @@
 
 并发翻倍仅 +13%，单实例反而变慢 → 瓶颈是资源争抢，不是线程池；显存约 110–140 MB/实例，8 GB 显卡在并发 16 时约 2 GB，不会爆显存，故已移除所有显存警告。
 / Doubling concurrency only gains 13% while per-instance build time grows: contention, not the thread pool. VRAM is ~110–140 MB per instance, so 16 instances need ~2 GB of 8 GB — VRAM warnings were removed.
+### 为提高 RPS 做过的尝试 / RPS improvement attempts
+
+按时间顺序记录了每一项尝试与实测结果，避免重复踩坑。
+
+| 尝试 | 做法 | 结果 |
+| --- | --- | --- |
+| 提高并发 | 跑分期间允许超出队列容量（并发 4 → 8） | 2.25 → 2.54 RPS（+13%），单实例构建 1.66 → 2.7–3.2 s |
+| 限制同时生成数 | `maxGeneratingCount` = 2 / 3 | 2.42 / 2.44 RPS（+4–5%），堆峰值反升到 3.0 GB |
+| 缩小跑分半径 | `Benchmark Chunk Radius` = 1（25→9 区块） | 2.74 RPS（+19%），`gen` 只从 ~2.0 s 降到 ~1.6 s |
+| 生成分步化 | 按时间预算把生成拆到多个服务器任务 | **失败**：跨 tick 时区块被卸载/降级，地形消失 |
+| 分步 + 区块驻留 | 分步期间加 FORCED ticket | **失败**：地形仍消失，26.3 的区块状态生命周期无法跨 tick 保持 |
+| 预览帧缓存 | 复用卡片渲染目标（仿 1.16.1 framebuffer pool） | **失败**：`RenderTarget` 无 `clear()`、无引用计数，复用时出现残影或已销毁纹理 |
+
+结论：
+
+1. RPS ≈ 并发 ÷ 单实例构建时间，而**单实例构建中约 70% 是不可并行的固定成本**（世界创建、出生点预生成、光照）；
+2. 并发类参数只有个位数到十几个百分点的收益，整机 CPU 已达 80–100%；
+3. 想进一步提速必须削减固定成本（出生点预生成范围、WorldLoader 开销），而不是继续调并发或预览半径；
+4. 上述失败项已全部回退，当前版本行为稳定。
 ### RPS 瓶颈分析 / Where the RPS goes
 
 实测数据（4060 Laptop / i9-12900HX / 32 GB，40% 生成）：

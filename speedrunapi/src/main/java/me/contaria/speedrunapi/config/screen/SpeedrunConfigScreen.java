@@ -171,6 +171,7 @@ public class SpeedrunConfigScreen extends Screen {
       java.util.Map.entry("advanced", "speedrunapi.group.advanced"),
       java.util.Map.entry("threading", "speedrunapi.group.threading"),
       java.util.Map.entry("misc", "speedrunapi.group.misc"),
+      java.util.Map.entry("benchmark", "speedrunapi.group.benchmark"),
       java.util.Map.entry("debug", "speedrunapi.group.debug"),
       java.util.Map.entry("f3", "speedrunapi.group.f3"),
       java.util.Map.entry("more", "speedrunapi.group.more"),

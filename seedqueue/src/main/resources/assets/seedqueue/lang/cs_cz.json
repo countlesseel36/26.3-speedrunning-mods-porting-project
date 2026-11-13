@@ -109,7 +109,7 @@
   "speedrunapi.config.seedqueue.option.useWatchdog": "Hlídací pes",
   "speedrunapi.config.seedqueue.option.useWatchdog.description": "Spustí další vlákno, které každých 10 sekund kontroluje hlavní vlákna stacktrace pro diagnostiku problémů se zmrazením.",
   "speedrunapi.config.seedqueue.option.showDebugMenu": "Zobrazit debug menu",
-  "speedrunapi.config.seedqueue.option.showDebugMenu.description": "Vykreslí FPS graf a profiler na wall obrazovce.\n§cTohle používej pouze pro debugging, jakékoliv runy s touto možností budou neplatné!",
+  "speedrunapi.config.seedqueue.option.showDebugMenu.description": "Vykreslí FPS graf a profiler na wall obrazovce.",
   "speedrunapi.config.seedqueue.option.benchmarkResets": "Benchmark resety",
   "speedrunapi.config.seedqueue.option.benchmarkResets.description": "Výchozí počet resetů pro benchmark.\nBenchmark můžeš začít pomocí klávesové zkratky \"Začít benchmark\" a zrušit jej, než dosáhne vybraného počtu resetů pomocí klávesové zkratky \"Zastavit benchmark\".",
   "speedrunapi.config.seedqueue.option.showChunkMaps": "SeedQueue chunkmaps",

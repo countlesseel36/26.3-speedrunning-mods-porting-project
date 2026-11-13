@@ -128,7 +128,7 @@
   "speedrunapi.config.seedqueue.option.useWatchdog": "Watchdog",
   "speedrunapi.config.seedqueue.option.useWatchdog.description": "Launches an extra thread that prints out the main threads stacktrace every 10 seconds to diagnose freezing issues.",
   "speedrunapi.config.seedqueue.option.showDebugMenu": "Show Debug Menu",
-  "speedrunapi.config.seedqueue.option.showDebugMenu.description": "Renders an FPS Graph and a Profiler on top of the Wall Screen.\n搂cUse this only for debugging, any runs played with this option enabled will be invalidated!",
+  "speedrunapi.config.seedqueue.option.showDebugMenu.description": "Renders an FPS Graph and a Profiler on top of the Wall Screen.",
   "speedrunapi.config.seedqueue.option.benchmarkResets": "Benchmark Resets",
   "speedrunapi.config.seedqueue.option.benchmarkResets.description": "How many resets a benchmark run performs (1-1000). Press B to start, N or Esc to cancel.",
   "speedrunapi.config.seedqueue.option.showChunkMaps": "Chunkmap Overlay",
@@ -179,5 +179,14 @@
   "speedrunapi.config.seedqueue.option.keyBindings.description": "Key bindings used on the wall (edited in the keybindings screen).",
   "speedrunapi.config.seedqueue.option.showChunkProgress": "Chunk Progress",
   "speedrunapi.config.seedqueue.option.showChunkProgress.description": "Show the generated/total chunk counter on the cards. Hidden by default.",
-  "seedqueue.key.backToWall": "Return to wall"
+  "seedqueue.key.backToWall": "Return to wall",
+  "speedrunapi.config.seedqueue.option.benchmarkConcurrency.description": "How many instances build in parallel during a benchmark; 0 = follow queue size (rows x columns).",
+  "speedrunapi.config.seedqueue.option.benchmarkSampleTicks.description": "Resource sampling interval during a benchmark, in ticks; 0 disables sampling (default 100).",
+  "speedrunapi.config.seedqueue.option.maxGeneratingCount.description": "Maximum number of instances generating at the same time; 0 = unlimited. Lower values reduce CPU contention.",
+  "speedrunapi.config.seedqueue.option.benchmarkChunkRadius.description": "Chunk radius used while benchmarking (1-10). Smaller generates faster but shows less terrain.",
+  "speedrunapi.config.seedqueue.option.benchmarkConcurrency": "Benchmark Concurrency",
+  "speedrunapi.config.seedqueue.option.benchmarkSampleTicks": "Benchmark Sample Ticks",
+  "speedrunapi.config.seedqueue.option.maxGeneratingCount": "Max Generating Count",
+  "speedrunapi.config.seedqueue.option.benchmarkChunkRadius": "Benchmark Chunk Radius",
+  "speedrunapi.config.seedqueue.option.simulatedWindowSize.description": "Simulated preview resolution; 0 follows the real window. Must match the window or cards get cropped."
 }

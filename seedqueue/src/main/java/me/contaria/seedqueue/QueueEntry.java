@@ -50,6 +50,14 @@ public final class QueueEntry {
    private long serverMs;
    private long genMs;
    private long captureMs;
+   /** beta.5b：跨 step 保存的生成状态。 */
+   private boolean genInitialized;
+   private int genRingCursor;
+   private int genSpawnX;
+   private int genSpawnZ;
+   private net.minecraft.server.level.ServerLevel genLevel;
+   private net.minecraft.server.level.ServerChunkCache genChunkSource;
+   private boolean genTicketAdded;
    public volatile long readyAt;
    public volatile long discardStartAt;
    private volatile boolean deleteAfterPrepare;
@@ -102,6 +110,8 @@ public final class QueueEntry {
 
    public volatile com.mojang.blaze3d.pipeline.RenderTarget renderTarget;
    public volatile com.mojang.blaze3d.pipeline.RenderTarget displayTarget;
+   /** 复用渲染目标时，在新帧写入之前不要把这张卡画出来（避免显示上一个实例的残影）。 */
+   public volatile boolean displayValid;
    /** prepareExternal (section tracker + allChanged) only has to run once per built preview level. */
    public volatile boolean sectionsPrepared;
    public volatile long lastRenderedAt;
@@ -128,6 +138,11 @@ public final class QueueEntry {
    private double cameraZ;
    public final int mapWidth = 32;
    public final int mapHeight = 20;
+   /** 当前实例的集成服务端（用于区分"发送伤害包的服务端"与"玩家真正所在的服务端"）。 */
+   public net.minecraft.server.MinecraftServer server() {
+      return this.server;
+   }
+
    public volatile int chunksGenerated;
    public volatile int chunksTotal;
    public volatile int stageProgress;
@@ -644,215 +659,245 @@ public final class QueueEntry {
       }
    }
 
+   /** 跑分期间使用 benchmarkChunkRadius，其余情况使用实例自身的半径。 */
+   private int effectiveRadius() {
+      return SeedQueue.benchmarking && QueueConfig.benchmarkChunkRadius > 0
+         ? QueueConfig.benchmarkChunkRadius
+         : this.chunkRadius;
+   }
+
    private void startGenerating() {
       state = State.GENERATING;
       this.reachedLimit = false;
-      int radius = chunkRadius;
+      int radius = effectiveRadius();
       int diameter = radius * 2 + 1;
       chunksTotal = diameter * diameter;
       long started = System.currentTimeMillis();
       SeedQueue.LOGGER.info("[seedqueue] entry #{} generating {} chunks", number, chunksTotal);
-      server.execute(() -> {
+      SeedQueue.acquireGeneratingPermit();
+      server.execute(this::generateStep);
+   }
+
+   /** 生成任务体（beta.5a 纯抽取：行为与原先的 lambda 完全一致）。 */
+   private void generateStep() {
+      try {
+         int radius = effectiveRadius();
+         long started = prepareT0;
+         if (!this.genInitialized) {
+            this.genLevel = server.overworld();
+            this.genChunkSource = this.genLevel.getChunkSource();
+            var spawnPos = this.genLevel.getRespawnData().pos();
+            this.genSpawnX = spawnPos.getX() >> 4;
+            this.genSpawnZ = spawnPos.getZ() >> 4;
+            this.genRingCursor = 0;
+            this.genInitialized = true;
+
+         }
+
+         var level = this.genLevel;
+         var chunkSource = this.genChunkSource;
+         int spawnX = this.genSpawnX;
+         int spawnZ = this.genSpawnZ;
+         long stepStart = System.nanoTime();
+
+         // Generate from the spawn chunk outwards; the packet snapshot is taken afterwards so the
+         // light engine has fully propagated (capturing mid-generation leaves unlit, black chunks).
+         generateLoop:
+         for (int ring = 0; ring <= radius; ring++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+               for (int dz = -radius; dz <= radius; dz++) {
+                  if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) {
+                     continue;
+                  }
+
+                  if (!waitForGenerationPermit()) {
+                     break generateLoop;
+                  }
+
+                  if (state == State.DISCARDED) {
+                     return;
+                  }
+
+                  chunkSource.getChunk(
+                     spawnX + dx, spawnZ + dz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, true
+                  );
+                  chunksGenerated++;
+
+                  // Chunkmap Freezing: refresh the map while generating until the configured time,
+                  // then stop updating it (the overlay keeps showing the frozen snapshot).
+                  long elapsed = System.currentTimeMillis() - started;
+
+                  if (elapsed - this.lastMapCaptureAt >= 250L
+                     && (QueueConfig.chunkMapFreezing < 0 || elapsed < QueueConfig.chunkMapFreezing)) {
+                     this.lastMapCaptureAt = elapsed;
+                     this.captureMap(level, spawnX, spawnZ);
+                  }
+               }
+            }
+
+         }
+
+         this.genInitialized = false;
+
          try {
-            var level = server.overworld();
-            var chunkSource = level.getChunkSource();
+            for (int i = 0; i < 128 && level.getLightEngine().hasLightWork(); i++) {
+               level.getLightEngine().runLightUpdates();
+            }
+         } catch (Throwable t) {
+            SeedQueue.LOGGER.warn("[seedqueue] failed to flush light before capturing preview chunks", t);
+         }
 
-            var spawnPos = level.getRespawnData().pos();
-            int spawnX = spawnPos.getX() >> 4;
-            int spawnZ = spawnPos.getZ() >> 4;
+         for (int ring = this.genRingCursor; ring <= radius; ring++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+               for (int dz = -radius; dz <= radius; dz++) {
+                  if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) {
+                     continue;
+                  }
 
-            // Generate from the spawn chunk outwards; the packet snapshot is taken afterwards so the
-            // light engine has fully propagated (capturing mid-generation leaves unlit, black chunks).
-            generateLoop:
-            for (int ring = 0; ring <= radius; ring++) {
-               for (int dx = -radius; dx <= radius; dx++) {
-                  for (int dz = -radius; dz <= radius; dz++) {
-                     if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) {
-                        continue;
-                     }
-
-                     if (!waitForGenerationPermit()) {
-                        break generateLoop;
-                     }
-
-                     if (state == State.DISCARDED) {
-                        return;
-                     }
-
-                     chunkSource.getChunk(
-                        spawnX + dx, spawnZ + dz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, true
+                  net.minecraft.world.level.chunk.LevelChunk chunk =
+                     (net.minecraft.world.level.chunk.LevelChunk)chunkSource.getChunk(
+                        spawnX + dx, spawnZ + dz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false
                      );
-                     chunksGenerated++;
 
-                     // Chunkmap Freezing: refresh the map while generating until the configured time,
-                     // then stop updating it (the overlay keeps showing the frozen snapshot).
-                     long elapsed = System.currentTimeMillis() - started;
-
-                     if (elapsed - this.lastMapCaptureAt >= 250L
-                        && (QueueConfig.chunkMapFreezing < 0 || elapsed < QueueConfig.chunkMapFreezing)) {
-                        this.lastMapCaptureAt = elapsed;
-                        this.captureMap(level, spawnX, spawnZ);
-                     }
-                  }
-               }
-            }
-
-            try {
-               for (int i = 0; i < 128 && level.getLightEngine().hasLightWork(); i++) {
-                  level.getLightEngine().runLightUpdates();
-               }
-            } catch (Throwable t) {
-               SeedQueue.LOGGER.warn("[seedqueue] failed to flush light before capturing preview chunks", t);
-            }
-
-            for (int ring = 0; ring <= radius; ring++) {
-               for (int dx = -radius; dx <= radius; dx++) {
-                  for (int dz = -radius; dz <= radius; dz++) {
-                     if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) {
-                        continue;
-                     }
-
-                     net.minecraft.world.level.chunk.LevelChunk chunk =
-                        (net.minecraft.world.level.chunk.LevelChunk)chunkSource.getChunk(
-                           spawnX + dx, spawnZ + dz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false
-                        );
-
-                     if (chunk != null) {
-                        try {
-                           chunkPackets.add(
-                              new net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket(
-                                 chunk, level.getLightEngine(), null, null
-                              )
-                           );
-                        } catch (Throwable ignored) {
-                        }
-                     }
-                  }
-               }
-            }
-
-            // Refill the snapshot while the server is still running (this is the prepare thread, before
-            // park()). A chunk can be skipped when it was already loaded, so the preview level used to
-            // end up with holes (16/25) that rendered as black in the cards.
-            genMs = System.currentTimeMillis() - prepareT0 - serverMs;
-            long captureStart = System.currentTimeMillis();
-            if (Boolean.parseBoolean(System.getProperty("seedqueue.fillMissingChunks", "true"))) {
-               int filled = 0;
-
-               for (int dx = -radius; dx <= radius; dx++) {
-                  for (int dz = -radius; dz <= radius; dz++) {
-                     if (state == State.DISCARDED) {
-                        return;
-                     }
-
-                     int chunkX = spawnX + dx;
-                     int chunkZ = spawnZ + dz;
-
-
-                     if (hasPacketFor(chunkX, chunkZ)) {
-
-
-                        continue;
-
-
-                     }
-
-
-                     // 只补外圈缺失的区块：预览实测并不缺块，全量强制生成只会拖慢构建
-                     if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
-                        continue;
-                     }
-
-
-
-
-
+                  if (chunk != null) {
                      try {
-                        net.minecraft.world.level.chunk.LevelChunk chunk =
-                           (net.minecraft.world.level.chunk.LevelChunk)chunkSource.getChunk(
-                              chunkX, chunkZ, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, true
-                           );
-
-                        if (chunk == null) {
-                           continue;
-                        }
-
                         chunkPackets.add(
                            new net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket(
                               chunk, level.getLightEngine(), null, null
                            )
                         );
-                        filled++;
-                     } catch (Throwable t) {
-                        SeedQueue.LOGGER.warn("[seedqueue] entry #{} failed to snapshot chunk {},{}", number, chunkX, chunkZ, t);
+                     } catch (Throwable ignored) {
                      }
                   }
                }
+            }
+         }
 
-            this.captureMs = System.currentTimeMillis() - captureStart;
-               int expected = (2 * radius + 1) * (2 * radius + 1);
-               SeedQueue.LOGGER.info(
-                  "[seedqueue] entry #{} preview packets: {} ({} filled, expected {})",
-                  number, chunkPackets.size(), filled, expected
-               );
+         // Refill the snapshot while the server is still running (this is the prepare thread, before
+         // park()). A chunk can be skipped when it was already loaded, so the preview level used to
+         // end up with holes (16/25) that rendered as black in the cards.
+         genMs = System.currentTimeMillis() - prepareT0 - serverMs;
+         long captureStart = System.currentTimeMillis();
+         if (Boolean.parseBoolean(System.getProperty("seedqueue.fillMissingChunks", "true"))) {
+            int filled = 0;
 
-               if (chunkPackets.size() < expected) {
-                  StringBuilder missingList = new StringBuilder();
-
-                  for (int dx = -radius; dx <= radius; dx++) {
-                     for (int dz = -radius; dz <= radius; dz++) {
-                        if (hasPacketFor(spawnX + dx, spawnZ + dz)) {
-                           continue;
-                        }
-
-                        if (missingList.length() > 0) {
-                           missingList.append(' ');
-                        }
-
-                        missingList.append(dx).append(',').append(dz);
-                     }
+            for (int dx = -radius; dx <= radius; dx++) {
+               for (int dz = -radius; dz <= radius; dz++) {
+                  if (state == State.DISCARDED) {
+                     return;
                   }
 
-                  SeedQueue.LOGGER.warn(
-                     "[seedqueue] entry #{} missing preview chunks (relative): {}", number, missingList
-                  );
+                  int chunkX = spawnX + dx;
+                  int chunkZ = spawnZ + dz;
+
+
+                  if (hasPacketFor(chunkX, chunkZ)) {
+
+
+                     continue;
+
+
+                  }
+
+
+                  // 只补外圈缺失的区块：预览实测并不缺块，全量强制生成只会拖慢构建
+                  if (Math.abs(dx) != radius && Math.abs(dz) != radius) {
+                     continue;
+                  }
+
+
+
+
+
+                  try {
+                     net.minecraft.world.level.chunk.LevelChunk chunk =
+                        (net.minecraft.world.level.chunk.LevelChunk)chunkSource.getChunk(
+                           chunkX, chunkZ, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, true
+                        );
+
+                     if (chunk == null) {
+                        continue;
+                     }
+
+                     chunkPackets.add(
+                        new net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket(
+                           chunk, level.getLightEngine(), null, null
+                        )
+                     );
+                     filled++;
+                  } catch (Throwable t) {
+                     SeedQueue.LOGGER.warn("[seedqueue] entry #{} failed to snapshot chunk {},{}", number, chunkX, chunkZ, t);
+                  }
                }
             }
 
-            genMs = System.currentTimeMillis() - prepareT0 - serverMs;
-            // (removed duplicate captureStart)
-            captureMap(level, spawnX, spawnZ);
-            long captureMs = System.currentTimeMillis() - captureStart;
-            state = State.READY;
-      readyAt = System.currentTimeMillis();
-            readyAtMillis = System.currentTimeMillis();
-
-            // World preview is now visible: keep generating outer rings in the background and feed
-            // the new chunks to the preview so the cards fill out further over time.
-            try {
-               extendGeneration(level, chunkSource, spawnX, spawnZ, radius);
-            } catch (Throwable t) {
-               SeedQueue.LOGGER.warn("[seedqueue] entry #{} extended generation failed", number, t);
-            }
-            park();
+         this.captureMs = System.currentTimeMillis() - captureStart;
+            int expected = (2 * radius + 1) * (2 * radius + 1);
             SeedQueue.LOGGER.info(
-               "[seedqueue] entry #{} ready (seed {}, {} chunks in {} ms; server={}ms gen={}ms capture={}ms)",
-               number,
-               seed,
-               chunksGenerated,
-               System.currentTimeMillis() - prepareT0,
-               serverMs,
-               genMs,
-               captureMs
+               "[seedqueue] entry #{} preview packets: {} ({} filled, expected {})",
+               number, chunkPackets.size(), filled, expected
             );
 
-            SeedQueue.logMemory("after entry #" + number + " ready");
-         } catch (Throwable t) {
-            state = State.FAILED;
-            error = t.toString();
-            SeedQueue.LOGGER.error("[seedqueue] entry #{} chunk generation failed", number, t);
+            if (chunkPackets.size() < expected) {
+               StringBuilder missingList = new StringBuilder();
+
+               for (int dx = -radius; dx <= radius; dx++) {
+                  for (int dz = -radius; dz <= radius; dz++) {
+                     if (hasPacketFor(spawnX + dx, spawnZ + dz)) {
+                        continue;
+                     }
+
+                     if (missingList.length() > 0) {
+                        missingList.append(' ');
+                     }
+
+                     missingList.append(dx).append(',').append(dz);
+                  }
+               }
+
+               SeedQueue.LOGGER.warn(
+                  "[seedqueue] entry #{} missing preview chunks (relative): {}", number, missingList
+               );
+            }
          }
-      });
+
+         genMs = System.currentTimeMillis() - prepareT0 - serverMs;
+         // (removed duplicate captureStart)
+         captureMap(level, spawnX, spawnZ);
+         long captureMs = System.currentTimeMillis() - captureStart;
+         SeedQueue.releaseGeneratingPermit();
+         state = State.READY;
+   readyAt = System.currentTimeMillis();
+         readyAtMillis = System.currentTimeMillis();
+
+         // World preview is now visible: keep generating outer rings in the background and feed
+         // the new chunks to the preview so the cards fill out further over time.
+         try {
+            extendGeneration(level, chunkSource, spawnX, spawnZ, radius);
+         } catch (Throwable t) {
+            SeedQueue.LOGGER.warn("[seedqueue] entry #{} extended generation failed", number, t);
+         }
+         park();
+         SeedQueue.LOGGER.info(
+            "[seedqueue] entry #{} ready (seed {}, {} chunks in {} ms; server={}ms gen={}ms capture={}ms)",
+            number,
+            seed,
+            chunksGenerated,
+            System.currentTimeMillis() - prepareT0,
+            serverMs,
+            genMs,
+            captureMs
+         );
+
+         SeedQueue.logMemory("after entry #" + number + " ready");
+      } catch (Throwable t) {
+         state = State.FAILED;
+         error = t.toString();
+         SeedQueue.LOGGER.error("[seedqueue] entry #{} chunk generation failed", number, t);
+      } finally {
+         // 生成结束时一定归还许可（异常、丢弃路径同样有效），否则限制并发会死锁
+         SeedQueue.releaseGeneratingPermit();
+      }
    }
 
    /**
@@ -863,6 +908,7 @@ public final class QueueEntry {
     * the destroy call failed 244 times and the buffers stayed alive.</p>
     */
    private void destroyTarget(com.mojang.blaze3d.pipeline.RenderTarget target, String label) {
+
 
       if (target == null) {
          return;

@@ -38,5 +38,6 @@
   "speedrunapi.group.vanillaOnline": "联机选项",
   "speedrunapi.group.vanillaTelemetry": "遥测选项",
   "speedrunapi.group.global": "全局设置",
-  "speedrunapi.group.accessibility": "辅助功能设置"
+  "speedrunapi.group.accessibility": "辅助功能设置",
+  "speedrunapi.group.benchmark": "跑分"
 }

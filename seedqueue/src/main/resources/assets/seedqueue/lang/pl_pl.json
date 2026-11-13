@@ -99,7 +99,7 @@
   "speedrunapi.config.seedqueue.option.useWatchdog": "Strażnik",
   "speedrunapi.config.seedqueue.option.useWatchdog.description": "Uruchamia dodatkowy wątek, który co 10 sekund drukuje stos wywołań głównego wątku w celu diagnozowania problemów z zawieszaniem się.\n§cAby zmienić tę opcję, zrestartuj grę.",
   "speedrunapi.config.seedqueue.option.showDebugMenu": "Pokaż Menu do Debugowania",
-  "speedrunapi.config.seedqueue.option.showDebugMenu.description": "Renderuje wykres FPS i profiler na ekranie ściany.\n§cUżywaj tego tylko do debugowania, Jakikolwiek run z tą opcją nie będzie zweryfikowany!",
+  "speedrunapi.config.seedqueue.option.showDebugMenu.description": "Renderuje wykres FPS i profiler na ekranie ściany.",
   "speedrunapi.config.seedqueue.option.benchmarkResets": "Resety Benchmark",
   "speedrunapi.config.seedqueue.option.benchmarkResets.description": "Domyślna liczba resetów wykonywanych podczas uruchamiania benchmarku.\nMożesz rozpocząć benchmark, używając skrótu klawiaturowego \"Start Benchmark\", i anulować go przed osiągnięciem skonfigurowanej liczby resetów, używając skrótu klawiaturowego \"Stop Benchmark\".",
   "speedrunapi.config.seedqueue.option.showChunkMaps": "Chunkmapy SeedQueue",

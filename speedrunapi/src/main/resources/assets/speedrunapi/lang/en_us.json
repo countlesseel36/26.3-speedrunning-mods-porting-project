@@ -38,5 +38,6 @@
   "speedrunapi.group.vanillaOnline": "Online",
   "speedrunapi.group.vanillaTelemetry": "Telemetry",
   "speedrunapi.group.global": "Global",
-  "speedrunapi.group.accessibility": "Accessibility"
+  "speedrunapi.group.accessibility": "Accessibility",
+  "speedrunapi.group.benchmark": "Benchmark"
 }

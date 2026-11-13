@@ -109,7 +109,7 @@
   "speedrunapi.config.seedqueue.option.useWatchdog": "Vísor de Errores",
   "speedrunapi.config.seedqueue.option.useWatchdog.description": "Crea un hilo extra que escribe el stacktrace de los hilos principales cada 10 segundos para diagnosticar problemas de congelamiento en SeedQueue.",
   "speedrunapi.config.seedqueue.option.showDebugMenu": "Mostrar Menú de Depuración",
-  "speedrunapi.config.seedqueue.option.showDebugMenu.description": "Renderiza un gráfico de FPS y un Profiler encima de la ventana de la Wall.\n§cUsa esto solo para depuración ya que cualquier run usada con esta opción no será validada!",
+  "speedrunapi.config.seedqueue.option.showDebugMenu.description": "Renderiza un gráfico de FPS y un Profiler encima de la ventana de la Wall.",
   "speedrunapi.config.seedqueue.option.benchmarkResets": "Resets en Prueba de Rapidez",
   "speedrunapi.config.seedqueue.option.benchmarkResets.description": "La cantidad de resets que quieres hacer al activar la prueba de rendimiento.\nPuedes empezar una prueba usando la tecla \"In Test Rapidez\" y cancelarlo antes de que llegue al número de resets usando la tecla \"Fin Test Rapidez\".",
   "speedrunapi.config.seedqueue.option.showChunkMaps": "Chunkmaps de SeedQueue",

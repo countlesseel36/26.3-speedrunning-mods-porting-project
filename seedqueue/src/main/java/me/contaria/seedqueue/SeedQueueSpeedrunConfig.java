@@ -129,15 +129,36 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
    public boolean reduceLevelList = true;
 
    // Cap at 1000: SeedQueue tops out around 2.5 RPS, so a longer benchmark just wastes time.
-   @Config.Category("misc")
+   @Config.Category("benchmark")
    @Config.Numbers.Whole.Bounds(min = 1, max = 1000)
    public int benchmarkResets = 1000;
 
-   @Config.Category("misc")
-   @Config.Numbers.Whole.Bounds(min = -1, max = 500000)
+   /** 跑分期间并行构建的实例数；0 = 跟随队列容量。 */
+   @Config.Category("benchmark")
+   @Config.Numbers.Whole.Bounds(min = 0, max = 16)
+   public int benchmarkConcurrency = 0;
+
+   /** 跑分期间资源采样间隔（tick），0 = 关闭采样。 */
+   @Config.Category("benchmark")
+   @Config.Numbers.Whole.Bounds(min = 0, max = 400)
+   public int benchmarkSampleTicks = 100;
+
+   /** 同时处于"生成中"的实例数上限；0 = 不限制。 */
+   @Config.Category("benchmark")
+   @Config.Numbers.Whole.Bounds(min = 0, max = 16)
+   public int maxGeneratingCount = 0;
+
+   /** 跑分期间使用的区块半径（1–10）。 */
+   @Config.Category("benchmark")
+   @Config.Numbers.Whole.Bounds(min = 1, max = 10)
+   public int benchmarkChunkRadius = 2;
+
+   // -1 = OFF；上限收到 10 秒：500000ms（500 秒）让滑块几乎没有可用分辨率
+   @Config.Category("performance")
+   @Config.Numbers.Whole.Bounds(min = -1, max = 10000)
    public long chunkMapFreezing = -1L;
 
-   @Config.Category("misc")
+   @Config.Category("performance")
    public boolean checkMinMemory = true;
 
    @Config.Hide
@@ -314,6 +335,10 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
       this.freezeLockedPreviews = QueueConfig.freezeLockedPreviews;
       this.reduceLevelList = QueueConfig.reduceLevelList;
       this.benchmarkResets = QueueConfig.benchmarkResets;
+      this.benchmarkConcurrency = QueueConfig.benchmarkConcurrency;
+      this.benchmarkSampleTicks = QueueConfig.benchmarkSampleTicks;
+      this.maxGeneratingCount = QueueConfig.maxGeneratingCount;
+      this.benchmarkChunkRadius = QueueConfig.benchmarkChunkRadius;
       this.serverThreadPriority = QueueConfig.serverThreadPriority;
       this.backgroundExecutorThreadPriority = QueueConfig.backgroundExecutorThreadPriority;
    }
@@ -361,6 +386,10 @@ public final class SeedQueueSpeedrunConfig implements SpeedrunConfig {
       QueueConfig.freezeLockedPreviews = this.freezeLockedPreviews;
       QueueConfig.reduceLevelList = this.reduceLevelList;
       QueueConfig.benchmarkResets = Math.max(1, Math.min(1000, this.benchmarkResets));
+      QueueConfig.benchmarkConcurrency = Math.max(0, Math.min(16, this.benchmarkConcurrency));
+      QueueConfig.benchmarkSampleTicks = Math.max(0, Math.min(400, this.benchmarkSampleTicks));
+      QueueConfig.maxGeneratingCount = Math.max(0, Math.min(16, this.maxGeneratingCount));
+      QueueConfig.benchmarkChunkRadius = Math.max(1, Math.min(10, this.benchmarkChunkRadius));
       QueueConfig.serverThreadPriority = Math.max(1, Math.min(10, this.serverThreadPriority));
       QueueConfig.backgroundExecutorThreadPriority = Math.max(1, Math.min(10, this.backgroundExecutorThreadPriority));
       QueueConfig.save();

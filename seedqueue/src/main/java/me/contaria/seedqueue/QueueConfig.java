@@ -43,6 +43,14 @@ public final class QueueConfig {
    public static boolean smartSwitch = false;
    public static boolean waitForPreviewSetup = false;
    public static int benchmarkResets = 1000;
+   /** 跑分期间并行构建的实例数；0 = 跟随队列容量。 */
+   public static int benchmarkConcurrency = 0;
+   /** 跑分期间资源采样间隔（tick），0 = 关闭。 */
+   public static int benchmarkSampleTicks = 100;
+   /** 同时处于"生成中"的实例数上限；0 = 不限制。 */
+   public static int maxGeneratingCount = 0;
+   /** 跑分期间使用的区块半径（1–10）。 */
+   public static int benchmarkChunkRadius = 2;
    public static boolean reduceLevelList = true;
    public static boolean freezeLockedPreviews = false;
    public static int backgroundExecutorThreadPriority = 5;
@@ -231,6 +239,10 @@ public final class QueueConfig {
          json.addProperty("smartSwitch", smartSwitch);
          json.addProperty("waitForPreviewSetup", waitForPreviewSetup);
          json.addProperty("benchmarkResets", benchmarkResets);
+      json.addProperty("benchmarkConcurrency", benchmarkConcurrency);
+      json.addProperty("benchmarkSampleTicks", benchmarkSampleTicks);
+      json.addProperty("maxGeneratingCount", maxGeneratingCount);
+      json.addProperty("benchmarkChunkRadius", benchmarkChunkRadius);
          json.addProperty("reduceLevelList", reduceLevelList);
          json.addProperty("freezeLockedPreviews", freezeLockedPreviews);
          json.addProperty("backgroundExecutorThreadPriority", backgroundExecutorThreadPriority);

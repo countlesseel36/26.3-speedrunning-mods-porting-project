@@ -109,7 +109,7 @@
   "speedrunapi.config.seedqueue.option.useWatchdog": "מפעיל אבחונים",
   "speedrunapi.config.seedqueue.option.useWatchdog.description": "בעיות קיפאון.\nהשרשראות העיקריות כל 10 שניות כדי לאבחן\nמתחיל שרשרת נוספת שמדפיסה את דיווח",
   "speedrunapi.config.seedqueue.option.showDebugMenu": "הראה טבלת Debug",
-  "speedrunapi.config.seedqueue.option.showDebugMenu.description": "עם האפשרות הזאת פעילה יפסלc§!\nתשתמש בזה רק ל-debugging, כל ספידראןc§\nמסך הקיר.\nמציג גרף FPS ו-profiler  בחלק העליון של",
+  "speedrunapi.config.seedqueue.option.showDebugMenu.description": "עם האפשרות הזאת פעילה יפסלc§!",
   "speedrunapi.config.seedqueue.option.benchmarkResets": "מספר האיפוסים בבדיקת מהירות",
   "speedrunapi.config.seedqueue.option.benchmarkResets.description": "כפתור ה \"תפסיק בדיקת מהירות\" \nולעצור את הבדיקה לפני סיומה בעזרת\n\"תתחיל בדיקת מהירות\" \nאפשר להתחיל בדיקה עם כפתור ה\nמספר האיפסים שיעשו בבדיקת מהירות.",
   "speedrunapi.config.seedqueue.option.showChunkMaps": "מפות עולם",
