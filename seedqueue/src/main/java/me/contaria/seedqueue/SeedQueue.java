@@ -3508,17 +3508,19 @@ public final class SeedQueue implements ClientModInitializer {
          return;
       }
 
-      long unlocked = ENTRIES.stream().filter(entry -> !entry.locked).count();
+      // 锁定的实例同样占用队列槽位：若只按 unlocked 计数，队列里多出一个锁定实例后
+      // refill 会不断补新实例，再被 enforceParkedLimit 回收，表现为"一直重置同一个实例"。
+      long occupied = ENTRIES.size();
 
       // 跑分时需要更多实例并行构建：允许超出队列容量，用 benchmarkConcurrency 作为目标数量
       int target = benchmarking
          ? Math.max(queueSize(), Integer.getInteger("seedqueue.benchmarkConcurrency", queueSize()))
          : queueSize();
 
-      while (unlocked < target) {
+      while (occupied < target) {
          QueueEntry entry = new QueueEntry(nextEntryNumber++, RANDOM.nextLong());
          ENTRIES.add(entry);
-         unlocked++;
+         occupied++;
          LOGGER.info("[seedqueue] queued entry #{} (seed {})", entry.number, entry.seed);
 
          try {

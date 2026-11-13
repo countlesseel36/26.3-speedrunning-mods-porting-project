@@ -9,7 +9,7 @@
 
 | 文件 / File | 版本 / Version |
 | --- | --- |
-| `0.9.0-rc.6+26.3-SeedQueue.jar` | 0.9.0-rc.6 |
+| `0.9.0-rc.7+26.3-SeedQueue.jar` | 0.9.0-rc.7 |
 | `6.3.0-rc.1+26.3-WorldPreview.jar` | 6.3.0-rc.1 |
 | `2.1.0-rc.3+26.3-Speedrun-API.jar` | 2.1.0-rc.3 |
 | `2.3.0-rc.2+26.3-StandardSettings.jar` | 2.3.0-rc.2 |
@@ -24,6 +24,9 @@
   / **Sprint / sneak toggle state no longer flips**: the state is only restored when it was saved as pressed, so the toggle key is not triggered spuriously.
 - **F6 / 切卡的跳过保存标志改为同步恢复**：disconnect 一返回立刻还原，消除点「保存并退出」被误跳过保存的窗口。
   / **The skip-saves flag used by F6 / next-instance is restored synchronously** after disconnect returns, removing the window where Save and Quit could skip saving.
+
+- **修复锁定实例导致的重复重置**：`refillQueue` 之前不把锁定实例计入已占用槽位，导致队列超出上限后被 `enforceParkedLimit` 反复回收，表现为「锁定几个实例就一直重置几个」。现在锁定实例计入占用槽位。
+  / **Locked instances now count as occupied queue slots**; previously they were excluded, so the queue kept over-filling and the parked limit recycled entries in a loop.
 
 ### 变更 / Changes
 
