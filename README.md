@@ -55,6 +55,46 @@
 
 并发翻倍仅 +13%，单实例反而变慢 → 瓶颈是资源争抢，不是线程池；显存约 110–140 MB/实例，8 GB 显卡在并发 16 时约 2 GB，不会爆显存，故已移除所有显存警告。
 / Doubling concurrency only gains 13% while per-instance build time grows: contention, not the thread pool. VRAM is ~110–140 MB per instance, so 16 instances need ~2 GB of 8 GB — VRAM warnings were removed.
+### RPS 瓶颈分析 / Where the RPS goes
+
+实测数据（4060 Laptop / i9-12900HX / 32 GB，40% 生成）：
+
+| 并发 | 单实例构建 | 理论 RPS = 并发 ÷ 构建 | 实测 RPS | 差异 |
+| --- | --- | --- | --- | --- |
+| 4 | 1.66 s | 2.41 | 2.25 | −7%（补队列/预热抖动） |
+| 8 | 2.7–3.2 s | 2.5–3.0 | 2.54 | 基本持平 |
+
+关键结论：**RPS ≈ 并发 ÷ 单实例构建时间**，所以只有两条路——提高并发，或降低单实例构建时间。实测提高并发几乎无效，说明瓶颈在后者。
+
+单实例构建构成（子阶段计时）：
+
+| 阶段 | 耗时 | 占比 | 是否可并行 |
+| --- | --- | --- | --- |
+| `server` 世界创建（WorldLoader + 注册表烘焙） | 0.2–1.1 s | 15–30% | 每个实例内部串行 |
+| `gen` 区块生成 | 1.1–2.2 s | **60–75%** | 实例之间并行，实例内部串行 |
+| `capture` 抓包 + 写入预览世界 | 0.15–0.4 s | 10–20% | 串行 |
+
+为什么提高并发无效：
+
+1. **实例内部生成是串行的**：`gen` 阶段按环序逐个 `getChunk(..., FULL, true)`，一个实例同一时刻只占用 1 个 worldgen 线程；4 个实例也只用到 23 个后台线程中的 4 个。
+2. **加并发不会让单实例变快**，反而让每个实例争抢 CPU：8 并发时单实例构建从 1.66 s 涨到 2.7–3.2 s，净收益只有 +13%。
+3. **整机 CPU 已达 81–85%**（进程 74–78%），继续加并发只会增加 GC 与线程切换开销。
+
+不是瓶颈的部分（已排除）：
+
+- **显存**：约 110–140 MB/实例，8 GB 卡在并发 16 时约 2 GB；
+- **堆内存**：峰值 2.4 GB / 6.1 GB，GC 未成为限制；
+- **线程池**：`clamp(核数−1, 1, 255)` = 23（本机），远高于并发数；
+- **磁盘/网络**：队列世界全在内存中，无存档读写。
+
+因此真正有效的优化方向是**降低单实例成本**：
+
+1. **缩小预览半径**（2 → 1：25 → 9 个区块，生成量降到 36%，预期构建时间 ×0.4）；
+2. **调低 `maxWorldGenerationPercentage`**（生成到一部分即停，剩余由抓包补齐；代价是卡片边缘可能延迟出图）；
+3. **减少每区块工作量**（关闭怪物生成、最小模拟距离、`randomTickSpeed=0`，不改 structures 以免改变种子）；
+4. **实例内并行生成**（把环序生成改成一次提交多个区块任务，需改 `gen` 实现，风险较高）。
+
+/ **RPS ≈ concurrency ÷ per-instance build time.** Raising concurrency does not help because each instance generates chunks serially and per-instance time grows with contention (1.66 s → 2.7–3.2 s). CPU is already at 81–85%, while VRAM (~110–140 MB/instance), heap (2.4/6.1 GB) and the 23-thread background pool are not the limit. Effective optimisations reduce per-instance cost: smaller preview radius (25 → 9 chunks), lower `maxWorldGenerationPercentage`, cheaper per-chunk work (no mob spawning, minimal simulation distance), or intra-instance parallel chunk generation.
 ## 已知问题 / Known issues
 
 1. 未修复：第三人称下玩家皮肤消失
@@ -98,6 +138,8 @@
 所有 `-Dseedqueue.*` 启动参数（跑分、预览、日志、行为开关、冒烟测试）按分类整理在：
 
 **[docs/debug-parameters.md](docs/debug-parameters.md)**
+
+各配置项（队列 / 墙 / 性能 / 线程 / 杂项）的说明见 **[docs/seedqueue-config.md](docs/seedqueue-config.md)**。
 
 所有参数均为测试用途，随时可能增删，不做兼容承诺；排查完请移除。
 / All `-Dseedqueue.*` flags are test-only, may change without notice; remove them after debugging.
