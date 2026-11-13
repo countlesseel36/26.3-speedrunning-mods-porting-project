@@ -148,3 +148,11 @@ dist/
 - 每次构建完成追加一行到本文件的构建日志表。
 | 2026-11-12 | SeedQueue | `0.9.0-rc.4-build.10+26.3` | 跑分分段计时与现状分析，优化方案记录于 `docs/benchmark-analysis.md`（暂不实施） | `dist/` |
 | 2026-11-12 | SeedQueue | `0.9.0-rc.4-build.28+26.3` | 跑分实测、子阶段计时、预览误判回退；记录于 `docs/benchmark-and-preview-notes.md`（未提交） | `dist/` |
+
+## 版本号策略（2026-11-12 更新）
+
+- **本地构建**：一律带 build 号，例如 `0.9.0-rc.5-build.1+26.3`、`0.9.0-rc.5-build.2+26.3`；
+- **发布时**：文件名去掉 build 号，并对 build 号不为 1 的模组把 rc 号进一位，例如
+  `0.9.0-rc.5-build.3` → 发布为 `0.9.0-rc.6`；
+- 发布后继续本地修改，从 `0.9.0-rc.5-build.1`（或下一个 rc 线的 build.1）重新计数；
+- 发布产物与本地构建分开归档：发布版本留在 `dist/`（或 release），本地中间构建进 `dist/past-build/<Mod>/`。

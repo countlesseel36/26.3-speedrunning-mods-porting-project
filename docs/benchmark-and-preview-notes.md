@@ -26,7 +26,7 @@
 - 总耗时统一以 prepareT0 为基准（此前基准不一致，已修）。
 
 ## 4. 跑分配置
-- 跑分期间强制 maxWorldGenerationPercentage = 80%，取消或跑满后恢复用户设定值。
+- 跑分不再改动 maxWorldGenerationPercentage，完全跟随玩家配置（v0.4.1 起）。
 
 ## 5. 环境变量
 | 参数 | 作用 |

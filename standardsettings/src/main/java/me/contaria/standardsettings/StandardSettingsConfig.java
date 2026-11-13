@@ -381,12 +381,15 @@ public class StandardSettingsConfig implements SpeedrunConfig {
       this.register(CustomStandardSetting.ofEnum("perspective", "more", options::getCameraType, options::setCameraType, CameraType.class)).disable();
 
       this.register("sneaking", "more", options.keyShift::isDown, value -> {
-         if ((Boolean)options.toggleCrouch().get() && options.keyShift.isDown() != value) {
+         // 仅在保存状态为"按下"时恢复；值为 false 时不要动，否则 ToggleKeyMapping 的
+         // setDown(true) 会把切换状态翻转（表现为每次进世界潜行状态取反）。
+         if (Boolean.TRUE.equals(value) && (Boolean)options.toggleCrouch().get() && !options.keyShift.isDown()) {
             options.keyShift.setDown(true);
          }
       }).disable();
       this.register("sprinting", "more", options.keySprint::isDown, value -> {
-         if ((Boolean)options.toggleSprint().get() && options.keySprint.isDown() != value) {
+         // 同上：保存的疾跑状态为 false 时保持不动，避免每次进世界翻转切换状态
+         if (Boolean.TRUE.equals(value) && (Boolean)options.toggleSprint().get() && !options.keySprint.isDown()) {
             options.keySprint.setDown(true);
          }
       }).disable();

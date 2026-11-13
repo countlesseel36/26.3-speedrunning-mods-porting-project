@@ -1093,8 +1093,7 @@ public final class SeedQueue implements ClientModInitializer {
 
             if (benchmarkCount >= Integer.getInteger("seedqueue.benchmarkResets", QueueConfig.benchmarkResets)) {
                benchmarking = false;
-               restoreGenerationLimit();
-               benchmarkFinishedAt = System.currentTimeMillis();
+                        benchmarkFinishedAt = System.currentTimeMillis();
                benchmarkResultResets = benchmarkCount;
                benchmarkResultMs = Math.max(1L, benchmarkFinishedAt - benchmarkStarted);
                playSound("finish_benchmark");
@@ -1268,16 +1267,15 @@ public final class SeedQueue implements ClientModInitializer {
          } catch (Throwable inner) {
             LOGGER.warn("[seedqueue] direct disconnect failed", inner);
          }
-      }
-
-      // Set it immediately (the normal pause return relies on this), and keep a pending flag so the
-      // tick can put the wall back if vanilla's disconnect completion replaced it.
-      // Clear the flag on the next tick: vanilla saves during disconnect, which is now skipped.
-      try {
+      } finally {
+         // 与 FastReset 自己的按钮一致：disconnect 一返回就恢复，避免"下一 tick 才恢复"的窗口里
+         // 玩家点"保存并退出"被误跳过保存。
          if (!fastResetWasSkipping) {
-            minecraft.execute(() -> fast_reset.client.FastReset.skipSavesNow = false);
+            try {
+               fast_reset.client.FastReset.skipSavesNow = false;
+            } catch (Throwable ignored) {
+            }
          }
-      } catch (Throwable ignored) {
       }
 
       minecraft.setScreenAndShow(wallScreen);
@@ -3701,6 +3699,17 @@ public final class SeedQueue implements ClientModInitializer {
 
    private static long lastPlayNextLockAt;
 
+   private static String sodiumVersion() {
+      try {
+         return net.fabricmc.loader.api.FabricLoader.getInstance()
+            .getModContainer("sodium")
+            .map(mod -> mod.getMetadata().getVersion().getFriendlyString())
+            .orElse("none");
+      } catch (Throwable t) {
+         return "unknown";
+      }
+   }
+
    private static int resourceSampleTicks;
    private static long lastGpuEstimate;
 
@@ -3755,38 +3764,24 @@ public final class SeedQueue implements ClientModInitializer {
       benchmarkCount = 0;
       benchmarkStarted = System.currentTimeMillis();
       benchmarkLastResetAt = 0L;
-      applyBenchmarkGenerationLimit();
+      // 环境摘要：远程测试者只需要贴这一行，就能判断配置差异
+      LOGGER.info(
+         "[seedqueue] benchmark env: java={} os={} cores={} heap={}MB window={}x{} queue={} gen={}% concurrency={} sodium={}",
+         System.getProperty("java.version"),
+         System.getProperty("os.name") + " " + System.getProperty("os.arch"),
+         Runtime.getRuntime().availableProcessors(),
+         Runtime.getRuntime().maxMemory() / (1024L * 1024L),
+         Minecraft.getInstance().getWindow().getWidth(),
+         Minecraft.getInstance().getWindow().getHeight(),
+         queueSize(),
+         QueueConfig.maxWorldGenerationPercentage,
+         Integer.getInteger("seedqueue.benchmarkConcurrency", queueSize()),
+         sodiumVersion()
+      );
       LOGGER.info("[seedqueue] benchmark started ({} resets)", Integer.getInteger("seedqueue.benchmarkResets", QueueConfig.benchmarkResets));
    }
 
    private static long benchmarkLastResetAt;
-   /** 跑分期间强制使用的生成百分比；-1 表示当前没有覆盖。 */
-   private static int savedMaxWorldGenerationPercentage = -1;
-
-   /** 跑分期间把 maxWorldGenerationPercentage 固定为 80%，避免半成品实例拖慢重置。 */
-   private static void applyBenchmarkGenerationLimit() {
-      if (savedMaxWorldGenerationPercentage < 0) {
-         savedMaxWorldGenerationPercentage = QueueConfig.maxWorldGenerationPercentage;
-         QueueConfig.maxWorldGenerationPercentage = 80;
-         LOGGER.info(
-            "[seedqueue] benchmark generation limit: {}% -> 80%",
-            savedMaxWorldGenerationPercentage
-         );
-      }
-   }
-
-   /** 跑分结束后恢复玩家设定的百分比。 */
-   private static void restoreGenerationLimit() {
-      if (savedMaxWorldGenerationPercentage >= 0) {
-         QueueConfig.maxWorldGenerationPercentage = savedMaxWorldGenerationPercentage;
-         LOGGER.info(
-            "[seedqueue] benchmark generation limit restored to {}%",
-            savedMaxWorldGenerationPercentage
-         );
-         savedMaxWorldGenerationPercentage = -1;
-      }
-   }
-
    /** Cancels a running benchmark (also used from N / Esc while the overlay is up). */
    public static void cancelBenchmark() {
       if (!benchmarking) {
@@ -3794,7 +3789,6 @@ public final class SeedQueue implements ClientModInitializer {
       }
 
       benchmarking = false;
-      restoreGenerationLimit();
       benchmarkFinishedAt = System.currentTimeMillis();
       benchmarkResultResets = benchmarkCount;
       benchmarkResultMs = Math.max(1L, benchmarkFinishedAt - benchmarkStarted);
