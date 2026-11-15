@@ -200,9 +200,75 @@ public final class SeedQueue implements ClientModInitializer {
       PreviewPipeline.captureWallFrame(minecraft);
    }
 
+   /**
+    * 清理 saves/ 下遗留的队列世界。队列世界是临时目录（SeedQueue-*），正常丢弃时会删除，
+    * 但若出现延迟删除/删除失败，它们会一直堆积（实测曾累积 7593 个），把世界列表刷满。
+    * 启动时没有任何队列实例存在，因此这时清理是安全的。
+    */
+   private static void pruneStaleQueueWorlds() {
+      if (!QueueConfig.deleteDiscardedWorlds) {
+         return;
+      }
+
+      try {
+         java.nio.file.Path saves = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath().resolve("saves");
+
+         if (!java.nio.file.Files.isDirectory(saves)) {
+            return;
+         }
+
+         int deleted = 0;
+
+         try (var dirs = java.nio.file.Files.list(saves)) {
+            for (java.nio.file.Path dir : dirs.toList()) {
+               // 只删带临时标记的队列世界；玩家进入过的世界标记已被移除，绝不能删
+               if (!java.nio.file.Files.isDirectory(dir)
+                  || !dir.getFileName().toString().startsWith("SeedQueue-")) {
+                  continue;
+               }
+
+               // 玩过的世界（seedqueue_played.marker / 玩家数据 / level.dat）一律保留；
+               // 其余队列世界无论有没有临时标记都清理，避免残留。
+               if (me.contaria.seedqueue.QueueEntry.hasPlayerData(dir)) {
+                  LOGGER.info("[seedqueue] keeping {} (played or contains player data)", dir.getFileName());
+                  continue;
+               }
+
+               try (var paths = java.nio.file.Files.walk(dir)) {
+                  paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                     try {
+                        java.nio.file.Files.deleteIfExists(path);
+                     } catch (Throwable ignored) {
+                     }
+                  });
+               }
+
+               deleted++;
+            }
+         }
+
+         if (deleted > 0) {
+            LOGGER.info("[seedqueue] pruned {} stale queue worlds from saves/", deleted);
+         }
+      } catch (Throwable t) {
+         LOGGER.warn("[seedqueue] failed to prune stale queue worlds", t);
+      }
+   }
+
    @Override
    public void onInitializeClient() {
       QueueConfig.load();
+
+      // 启动时也清一次：兜住上次强杀/崩溃来不及执行关闭清理的情况。
+      pruneStaleQueueWorlds();
+
+      // 退出时清理未进入过的队列世界：此时所有实例都已停止，目录不再被占用。
+      Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+         try {
+            pruneStaleQueueWorlds();
+         } catch (Throwable ignored) {
+         }
+      }, "SeedQueue world cleanup"));
 
       if (QueueConfig.useWatchdog || Boolean.getBoolean("seedqueue.watchdog")) {
          startWatchdog();
@@ -1030,6 +1096,7 @@ public final class SeedQueue implements ClientModInitializer {
       for (QueueEntry entry : ENTRIES) {
          if (entry.locked) {
             entry.scheduledJoin = true;
+         entry.scheduledJoinAt = System.currentTimeMillis();
          }
       }
 
@@ -1049,6 +1116,12 @@ public final class SeedQueue implements ClientModInitializer {
       }
 
       for (QueueEntry entry : new ArrayList<>(ENTRIES)) {
+         if (entry.scheduledJoin && System.currentTimeMillis() - entry.scheduledJoinAt > 3000L) {
+            entry.scheduledJoin = false;
+            LOGGER.info("[seedqueue] expired scheduled join for #{}", entry.number);
+            continue;
+         }
+
          if (entry.scheduledJoin && entry.state == QueueEntry.State.READY && !entry.transferred) {
             LOGGER.info("[seedqueue] scheduled join for #{}", entry.number);
 
@@ -1224,6 +1297,18 @@ public final class SeedQueue implements ClientModInitializer {
    private static boolean pendingWallReturn;
    private static int wallReturnTicks;
 
+   private static long lastWallReturnAt;
+
+   /** 正在执行"进入实例/返回墙"这类切换时，墙上的点击必须被忽略，否则会发起第二次连接。 */
+   /** 仅表示"按了 M、但还没有开始进入"的窗口：这段时间里墙上的操作应被忽略。 */
+   public static boolean isPlayNextLockPending() {
+      return pendingPlayNextLock;
+   }
+
+   public static boolean isTransitionPending() {
+      return pendingPlayNextLock || joinInProgress || pendingWallReturn;
+   }
+
    public static boolean returnToWallFromJoinedWorld(Minecraft minecraft) {
       // "Playing in a world" means: this session joined a queued world from the wall and has not
       // left it yet. Everything else (title screen, wall, loading, preview levels bound to
@@ -1236,6 +1321,16 @@ public final class SeedQueue implements ClientModInitializer {
          return false;
       }
 
+      // M 之后立刻按 F6 会再次进入这里：第二次 disconnect 时 skipSavesNow 已被恢复，
+      // 于是走正常存档流程并卡在 "Saving world"。1 秒内只允许发起一次返回。
+      long now = System.currentTimeMillis();
+
+      if (now - lastWallReturnAt < 1000L) {
+         LOGGER.info("[seedqueue] return-to-wall ignored (already returning)");
+         return false;
+      }
+
+      lastWallReturnAt = now;
       joinedFromWall = false;
 
       try {
@@ -1396,6 +1491,7 @@ public final class SeedQueue implements ClientModInitializer {
          for (QueueEntry entry : ENTRIES) {
             if (entry.locked) {
                entry.scheduledJoin = true;
+      entry.scheduledJoinAt = System.currentTimeMillis();
             }
          }
       }
@@ -2284,6 +2380,36 @@ public final class SeedQueue implements ClientModInitializer {
 
       // Benchmark keeps running outside the wall: the overlay is not a WallScreen, so the
       // wall-driven update would stop and the reset loop would stall.
+      if (minecraft.level != null && minecraft.player != null
+         && joinedFromWall
+         && System.currentTimeMillis() - lastHandoffAt < 5000L
+         && (minecraft.gui.screen() instanceof net.minecraft.client.gui.screens.TitleScreen
+            || minecraft.gui.screen() instanceof net.minecraft.client.gui.screens.PauseScreen)) {
+         // 进入世界时连按 Esc 会把标题/暂停界面盖在世界之上，这里直接恢复
+         LOGGER.info(
+            "[seedqueue] dismissing {} after a wall join",
+            minecraft.gui.screen().getClass().getSimpleName()
+         );
+         minecraft.gui.setScreen(null);
+      }
+
+      // 兜底：世界已创建、但玩家还没生成且屏幕上仍盖着某个界面 —— 这就是"手动创建世界卡在
+      // Preparing for world creation..." 的状态。3 秒后强制关闭，并打印真实类名与标题。
+      if (minecraft.level != null && minecraft.player == null && minecraft.gui.screen() != null
+         && !(minecraft.gui.screen() instanceof WallScreen)) {
+         if (++stuckLoadingTicks == 60) {
+            LOGGER.info(
+               "[seedqueue] forcing the overlay closed: {} title={}",
+               minecraft.gui.screen().getClass().getSimpleName(),
+               minecraft.gui.screen().getTitle().getString()
+            );
+            suppressLoadingScreens = false;
+            minecraft.gui.setScreen(null);
+         }
+      } else {
+         stuckLoadingTicks = 0;
+      }
+
       if (minecraft.level != null && syncedDamageTypes == null) {
          try {
             syncedDamageTypes = minecraft.level.registryAccess()
@@ -2299,6 +2425,12 @@ public final class SeedQueue implements ClientModInitializer {
 
       if (benchmarking) {
          wallScheduledTick(minecraft);
+      }
+
+      // 过期清理：M 的请求只在紧接着的那次回墙里有效，残留会导致"打开墙就自动进入新世界"
+      if (pendingPlayNextLock && System.currentTimeMillis() - pendingPlayNextLockAt > 2000L) {
+         pendingPlayNextLock = false;
+         LOGGER.info("[seedqueue] pending play-next-lock expired");
       }
 
       if (pendingPlayNextLock && minecraft.level == null) {
@@ -2388,8 +2520,15 @@ public final class SeedQueue implements ClientModInitializer {
       // screen forever while the world was already rendering behind it.
       if (minecraft.level != null
          && minecraft.player != null
-         && minecraft.gui.screen() instanceof net.minecraft.client.gui.screens.LevelLoadingScreen) {
-         LOGGER.info("[seedqueue] dismissing the loading screen (world and player are ready)");
+         && (minecraft.gui.screen() instanceof net.minecraft.client.gui.screens.LevelLoadingScreen
+            || minecraft.gui.screen() instanceof net.minecraft.client.gui.screens.ProgressScreen)) {
+         // 手动创建世界时最终停在 ProgressScreen("Preparing for world creation...")，
+         // 之前只处理 LevelLoadingScreen，所以世界已经渲染出来、界面却关不掉。
+         LOGGER.info(
+            "[seedqueue] dismissing the loading screen {} (world and player are ready)",
+            minecraft.gui.screen().getClass().getSimpleName()
+         );
+         suppressLoadingScreens = false;
          minecraft.gui.setScreen(null);
       }
 
@@ -2409,6 +2548,13 @@ public final class SeedQueue implements ClientModInitializer {
          previewRadiusBuilt = QueueConfig.chunkRadius;
       }
 
+
+      if (suppressLoadingScreens && !joinInProgress && minecraft.level == null) {
+         // 上一次进入流程没有正常收尾时留下的标志：会吞掉 vanilla 的进度/加载界面，
+         // 表现为手动创建世界卡在 "Preparing for world creation"。
+         LOGGER.info("[seedqueue] clearing a stale loading-screen suppression");
+         suppressLoadingScreens = false;
+      }
 
       if (suppressLoadingScreens) {
          if (minecraft.level != null && minecraft.player != null) {
@@ -3295,8 +3441,27 @@ public final class SeedQueue implements ClientModInitializer {
       LOGGER.info("[seedqueue] evicting {} preview section managers ({})", evicted, reason);
    }
 
+   /** Atum / FastReset 是否正在执行自动重开。 */
+   private static boolean isResetInProgress() {
+      try {
+         Class<?> atum = Class.forName("me.voidxwalker.autoreset.Atum");
+         return atum.getField("shouldReset").getBoolean(null);
+      } catch (Throwable ignored) {
+         return false;
+      }
+   }
+
    public static boolean consumeForReset(Minecraft minecraft) {
       if (!integrate()) {
+         return false;
+      }
+
+      // 只有 Atum / FastReset 发起的"自动重开"才允许消费队列实例。
+      // 手动创建世界走的是同一个 vanilla 入口，之前会被误判成重开：
+      // 日志实测 `createFreshLevel flag=true` 紧接着 `consuming queued entry #1 for the reset`，
+      // 结果是手动创建的世界变成 SeedQueue-* 目录并卡在 Preparing for world creation。
+      if (!isResetInProgress()) {
+         LOGGER.info("[seedqueue] world creation is not a reset, using vanilla");
          return false;
       }
 
@@ -3342,14 +3507,39 @@ public final class SeedQueue implements ClientModInitializer {
       return discarded;
    }
 
+   private static long lastPruneAt;
+
+   /** 队列已空时顺手清理一次（带 30 秒去抖），不必等到退出游戏。 */
+   private static void pruneWhenQueueDrained() {
+      if (!ENTRIES.isEmpty()) {
+         return;
+      }
+
+      long now = System.currentTimeMillis();
+
+      if (now - lastPruneAt < 30_000L) {
+         return;
+      }
+
+      lastPruneAt = now;
+      pruneStaleQueueWorlds();
+   }
+
    /** Discards an entry on the background executor; never blocks the render thread. */
    private static void discardAsync(QueueEntry entry) {
       entry.discardStartAt = System.currentTimeMillis();
+      Runnable task = () -> {
+         entry.discard();
+         // 丢弃后立即处理该实例自己的目录：没进入过的直接删，进入过的保留
+         entry.deleteFolderIfUnplayed();
+         pruneWhenQueueDrained();
+      };
+
       try {
-         QueueExecutors.prepare().execute(entry::discard);
+         QueueExecutors.prepare().execute(task);
       } catch (Throwable t) {
          LOGGER.warn("[seedqueue] could not schedule discard for entry #{}, discarding inline", entry.number, t);
-         entry.discard();
+         task.run();
       }
    }
 
@@ -3513,7 +3703,9 @@ public final class SeedQueue implements ClientModInitializer {
             parked, limit, entry.number
          );
          ENTRIES.remove(entry);
-         entry.discard();
+         // entry.discard() 会在当前线程（通常是渲染线程）halt 服务端并等待其线程，
+         // 表现为偶发卡顿；回收同样是"稍后丢弃"，走异步路径即可。
+         discardAsync(entry);
          parked--;
       }
    }
@@ -3719,10 +3911,12 @@ public final class SeedQueue implements ClientModInitializer {
 
    /** 1.21.4 "Play Next Lock": plays the oldest locked world that is ready. */
    private static boolean pendingPlayNextLock;
+   private static long pendingPlayNextLockAt;
 
    /** Queues "play next locked instance" for the next tick (used from inside a world). */
    public static void requestPlayNextLock() {
       pendingPlayNextLock = true;
+      pendingPlayNextLockAt = System.currentTimeMillis();
    }
 
    /** True when at least one locked entry could be played. */
@@ -3793,6 +3987,7 @@ public final class SeedQueue implements ClientModInitializer {
       }
    }
 
+   private static int stuckLoadingTicks;
    private static int resourceSampleTicks;
    private static long lastGpuEstimate;
 
@@ -3948,8 +4143,23 @@ public final class SeedQueue implements ClientModInitializer {
    /** Spawn position of the preview the player joined from; survives the preview being released. */
    private static net.minecraft.core.BlockPos spawnAlignPos;
 
+   private static long lastHandoffAt;
+
    public static boolean playEntry(QueueEntry entry) {
       if (entry == null || entry.transferred) {
+         return false;
+      }
+
+      // 两次进入叠加会在同一条连接上连续断开/连接，最终卡在 "Saving world"
+      if (System.currentTimeMillis() - lastHandoffAt < 1000L) {
+         LOGGER.info("[seedqueue] playEntry ignored (a handoff just happened)");
+         return false;
+      }
+
+      // 更强的前置条件：必须先离开当前世界（level == null）才能进入下一个实例，
+      // 否则会在同一条连接上连续切换，表现为卡在 "Saving world"。
+      if (Minecraft.getInstance().level != null) {
+         LOGGER.info("[seedqueue] playEntry ignored (still in a world)");
          return false;
       }
 
@@ -3967,6 +4177,7 @@ public final class SeedQueue implements ClientModInitializer {
          }
 
          entry.scheduledJoin = true;
+      entry.scheduledJoinAt = System.currentTimeMillis();
          LOGGER.info("[seedqueue] entry #{} is not ready yet, scheduled join", entry.number);
          return false;
       }
@@ -3985,6 +4196,7 @@ public final class SeedQueue implements ClientModInitializer {
       // over the world, so entering is refused until the preview exists (or was explicitly skipped).
       if (QueueConfig.useWall && entry.externalPreview == null && entry.previewTexture == null) {
          entry.scheduledJoin = true;
+      entry.scheduledJoinAt = System.currentTimeMillis();
          LOGGER.info("[seedqueue] entry #{} has no preview yet, scheduled join", entry.number);
          return false;
       }

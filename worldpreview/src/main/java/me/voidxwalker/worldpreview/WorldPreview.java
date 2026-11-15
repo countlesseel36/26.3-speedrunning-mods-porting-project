@@ -161,14 +161,31 @@ public final class WorldPreview {
       }
    }
 
+   /** SeedQueue 的进入流程是否正在进行（没有安装 SeedQueue 时返回 false）。 */
+   private static boolean seedqueueJoinPending() {
+      try {
+         Class<?> seedqueue = Class.forName("me.contaria.seedqueue.SeedQueue");
+         return (boolean) seedqueue.getMethod("isTransitionPending").invoke(null);
+      } catch (Throwable ignored) {
+         return false;
+      }
+   }
+
    public static void onServerPreparingLevels(net.minecraft.server.MinecraftServer server) {
       LOGGER.info("[preview] {} (prepareLevels), creatingFreshLevel={}", BUILD, creatingFreshLevel);
       // Only worlds created from the "create new world" flow should get a preview; loading an
       // existing world must stay untouched.
       if (ENABLED && creatingFreshLevel) {
          creatingFreshLevel = false;
-         pending = true;
-         LOGGER.info("[preview] fresh world creation detected, preview armed");
+
+         // 只有 SeedQueue 的"进入队列实例"流程才需要武装预览。手动创建世界时武装预览会把
+         // 客户端卡在 "Preparing for world creation..."（实测）。
+         if (seedqueueJoinPending()) {
+            pending = true;
+            LOGGER.info("[preview] fresh world creation detected, preview armed");
+         } else {
+            LOGGER.info("[preview] fresh world creation outside SeedQueue, preview skipped");
+         }
       }
    }
 

@@ -65,6 +65,13 @@ public final class WallScreen extends Screen {
 
    @Override
    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+      // 按 M 之后、进入流程开始之前，墙上的按键一律无效（Esc 仍可关墙）。
+      // 只覆盖这段极短窗口，不用全局锁，也不影响正常操作。
+      if (SeedQueue.isPlayNextLockPending() && !event.isEscape()) {
+         SeedQueue.LOGGER.info("[seedqueue] wall key ignored while play-next-lock is pending");
+         return true;
+      }
+
       if (event.isEscape() && WallKeybindings.key(WallKeybindings.Action.QUIT) != com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE) {
          // Escape only closes the wall when "Quit Wall Screen" is actually bound to it.
          return true;
@@ -151,6 +158,7 @@ public final class WallScreen extends Screen {
                   hovered.locked = true;
                   hovered.lockedAt = System.currentTimeMillis();
                   hovered.scheduledJoin = true;
+               hovered.scheduledJoinAt = System.currentTimeMillis();
                   SeedQueue.playSound("lock_instance");
                   SeedQueue.LOGGER.info("[seedqueue] entry #{} scheduled to join", hovered.number);
                }
@@ -244,6 +252,13 @@ public final class WallScreen extends Screen {
 
    @Override
    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+      // "进入下一个锁定实例"或返回墙尚未完成时，再点一次卡片会发起第二次连接
+      // （实测：M 之后点左键会连续 handed to the client 两次，最终卡在 Saving world）
+      if (SeedQueue.isTransitionPending()) {
+         SeedQueue.LOGGER.info("[seedqueue] wall click ignored while a transition is pending");
+         return true;
+      }
+
       int button = event.button();
 
       // Only left (join), right (lock) and middle (discard) do anything. Mouse side buttons are

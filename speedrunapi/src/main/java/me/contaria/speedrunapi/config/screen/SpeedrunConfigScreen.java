@@ -664,6 +664,17 @@ public class SpeedrunConfigScreen extends Screen {
       graphics.fill(0, 0, this.width, 34, 0x90000000);
       graphics.centeredText(this.font, this.title, this.width / 2, 14, -1);
 
+      // SeedQueue 的配置页顶部醒目标注：这是移植版，逻辑不保证与原版一致
+      if (this.modID != null && this.modID.startsWith("seedqueue")) {
+         graphics.centeredText(
+            this.font,
+            Component.translatable("speedrunapi.seedqueue.warning"),
+            this.width / 2,
+            40,
+            0xFFFF5555
+         );
+      }
+
 
       // Scroll bar: track plus a proportional thumb on the right edge.
       int maxScroll = this.maxScroll(this.shownOptions.size());

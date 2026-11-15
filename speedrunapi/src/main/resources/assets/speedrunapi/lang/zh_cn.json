@@ -39,5 +39,6 @@
   "speedrunapi.group.vanillaTelemetry": "遥测选项",
   "speedrunapi.group.global": "全局设置",
   "speedrunapi.group.accessibility": "辅助功能设置",
-  "speedrunapi.group.benchmark": "跑分"
+  "speedrunapi.group.benchmark": "跑分",
+  "speedrunapi.seedqueue.warning": "仅供尝鲜使用，本 mod 不保证与 Minecraft 原版行为完全一致"
 }

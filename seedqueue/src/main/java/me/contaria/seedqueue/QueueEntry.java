@@ -60,6 +60,9 @@ public final class QueueEntry {
    private boolean genTicketAdded;
    public volatile long readyAt;
    public volatile long discardStartAt;
+   /** 临时队列世界标记：只有带此文件的世界才会被自动删除。 */
+   public static final String TEMP_MARKER = ".seedqueue-temporary";
+
    private volatile boolean deleteAfterPrepare;
    public volatile LevelStorageSource.LevelStorageAccess access;
    public volatile PackRepository packs;
@@ -69,6 +72,8 @@ public final class QueueEntry {
    public volatile boolean transferred;
    /** Set by the wall "schedule join" action: the entry joins as soon as it is ready. */
    public volatile boolean scheduledJoin;
+   /** 请求时间：超过 3 秒未就绪即失效，避免残留在下次打开墙时自动进入。 */
+   public volatile long scheduledJoinAt;
    /** Chunks generated after the preview appeared, drained into the preview by the wall. */
    public final java.util.List<net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket> pendingPackets =
       java.util.Collections.synchronizedList(new java.util.ArrayList<>());
@@ -151,7 +156,9 @@ public final class QueueEntry {
    public QueueEntry(int number, long seed) {
       this.number = number;
       this.seed = seed;
-      this.folder = "SeedQueue-" + System.currentTimeMillis() + "-" + number;
+      // 上游 1.21.4 风格：每个实例一个唯一目录
+      this.folder = "SeedQueue-" + System.currentTimeMillis() + "-" + number + "-"
+         + String.format("%08x", java.util.concurrent.ThreadLocalRandom.current().nextInt());
    }
 
    /** Difficulty configured in Atum, so queued worlds match what the reset key would create. */
@@ -178,6 +185,13 @@ public final class QueueEntry {
 
       try {
          worldDirectory = minecraft.getLevelSource().getBaseDir().resolve(folder);
+
+      try {
+         java.nio.file.Files.createDirectories(worldDirectory);
+         java.nio.file.Files.writeString(worldDirectory.resolve(TEMP_MARKER), Long.toString(number));
+      } catch (Throwable t) {
+         SeedQueue.LOGGER.warn("[seedqueue] failed to mark entry #{} as temporary", number, t);
+      }
          access = minecraft.getLevelSource().validateAndCreateAccess(folder);
          packs = ServerPacksSource.createPackRepository(access);
          LevelSettings settings = new LevelSettings(
@@ -630,6 +644,14 @@ public final class QueueEntry {
       try {
          minecraft.doWorldLoad(access, packs, stem, java.util.Optional.empty(), true);
          transferred = true;
+
+      // 玩家已经从墙上进入这个实例：它现在是正式世界，必须保留。
+      try {
+         java.nio.file.Files.deleteIfExists(this.worldDirectory.resolve(TEMP_MARKER));
+         SeedQueue.LOGGER.info("[seedqueue] entry #{} is now permanent (marker removed)", number);
+      } catch (Throwable t) {
+         SeedQueue.LOGGER.warn("[seedqueue] failed to make entry #{} permanent", number, t);
+      }
 
          SeedQueue.lastPlayedFolder = folder;
 
@@ -1189,8 +1211,64 @@ public final class QueueEntry {
       this.deleteWorldFolder();
    }
 
+   /** 世界是否"玩家进入过"（或含有玩家数据）：这类世界绝不能删除。 */
+   public static boolean hasPlayerData(java.nio.file.Path worldDirectory) {
+      try {
+         // 本项目/历史版本写入的"已游玩"标记
+         if (java.nio.file.Files.exists(worldDirectory.resolve("seedqueue_played.marker"))) {
+            return true;
+         }
+
+         // 单人世界的玩家数据在 level.dat 里（players/ 通常为空），用文件大小粗略判断
+         java.nio.file.Path levelDat = worldDirectory.resolve("level.dat");
+
+         if (java.nio.file.Files.isRegularFile(levelDat) && java.nio.file.Files.size(levelDat) > 1024L) {
+            return true;
+         }
+
+         java.nio.file.Path players = worldDirectory.resolve("players");
+
+         if (!java.nio.file.Files.isDirectory(players)) {
+            return false;
+         }
+
+         try (var files = java.nio.file.Files.list(players)) {
+            return files.anyMatch(java.nio.file.Files::isRegularFile);
+         }
+      } catch (Throwable ignored) {
+         return true;   // 读不到就当有数据，宁可保留
+      }
+   }
+
+   /** 丢弃后立即删除该实例自己的目录；玩过的（有玩家数据）保留。 */
+   public void deleteFolderIfUnplayed() {
+      try {
+         if (worldDirectory == null || !java.nio.file.Files.exists(worldDirectory)) {
+            return;
+         }
+
+         if (hasPlayerData(worldDirectory)) {
+            SeedQueue.LOGGER.info(
+               "[seedqueue] keeping {} (played or contains player data)",
+               worldDirectory.getFileName()
+            );
+            return;
+         }
+
+         this.deleteWorldFolder();
+      } catch (Throwable t) {
+         SeedQueue.LOGGER.warn("[seedqueue] failed to clean up entry #{}", number, t);
+      }
+   }
+
    private void deleteWorldFolder() {
       try {
+         if (worldDirectory != null
+            && hasPlayerData(worldDirectory)) {
+            SeedQueue.LOGGER.info("[seedqueue] not deleting {} (contains player data)", worldDirectory.getFileName());
+            return;
+         }
+
          if (worldDirectory != null
             && worldDirectory.isAbsolute()
             && java.nio.file.Files.exists(worldDirectory)
@@ -1206,6 +1284,7 @@ public final class QueueEntry {
             }
 
             SeedQueue.LOGGER.info("[seedqueue] deleted world folder {}", worldDirectory);
+
          }
       } catch (Throwable t) {
          SeedQueue.LOGGER.warn("[seedqueue] failed to delete world folder #{}", number, t);
