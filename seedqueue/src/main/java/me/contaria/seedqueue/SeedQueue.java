@@ -3939,13 +3939,32 @@ public final class SeedQueue implements ClientModInitializer {
     * 机制，不改变默认行为。</p>
     */
 
+   /** 玩家正在世界里游玩：此时后台生成会抢 CPU/内存，造成掉帧卡顿。 */
+   public static boolean isBackgroundGenerationPaused() {
+      try {
+         net.minecraft.client.Minecraft client = net.minecraft.client.Minecraft.getInstance();
+         return client.player != null && client.level != null && !wallShown && !benchmarking;
+      } catch (Throwable ignored) {
+         return false;
+      }
+   }
+
+   private static int effectiveGeneratingLimit() {
+      return Integer.getInteger("seedqueue.maxGeneratingCount", QueueConfig.maxGeneratingCount);
+   }
+
    private static final Object generatingLock = new Object();
    private static int generatingNow;
 
    /** 等待一个生成许可；上限由 QueueConfig.maxGeneratingCount 动态决定（0 = 不限制）。 */
    public static void acquireGeneratingPermit() {
       synchronized (generatingLock) {
-         int limit = Integer.getInteger("seedqueue.maxGeneratingCount", QueueConfig.maxGeneratingCount);
+         int limit = effectiveGeneratingLimit();
+
+         // 游玩期间只保留 1 个并发生成（不要降到 0：生成线程阻塞等待会让游戏卡住/未响应）
+         if (isBackgroundGenerationPaused()) {
+            limit = limit > 0 ? Math.min(limit, 1) : 1;
+         }
 
          while (limit > 0 && generatingNow >= limit) {
             try {
@@ -3955,7 +3974,7 @@ public final class SeedQueue implements ClientModInitializer {
                break;
             }
 
-            limit = Integer.getInteger("seedqueue.maxGeneratingCount", QueueConfig.maxGeneratingCount);
+            limit = effectiveGeneratingLimit();
          }
 
          generatingNow++;

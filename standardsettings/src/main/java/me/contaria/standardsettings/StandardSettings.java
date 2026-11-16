@@ -35,6 +35,47 @@ public class StandardSettings {
       LOGGER.info("Loaded StandardSettings");
    }
 
+   /** 把当前选项重新同步给服务端：模拟距离等由 ClientInformation 包生效。 */
+   private static void pushClientInformation() {
+      try {
+         net.minecraft.client.Minecraft client = net.minecraft.client.Minecraft.getInstance();
+
+         if (client.getConnection() != null) {
+            client.getConnection().send(
+               new net.minecraft.network.protocol.common.ServerboundClientInformationPacket(
+                  client.options.buildPlayerInformation()
+               )
+            );
+            LOGGER.info("[standardsettings] pushed client information (simulation distance)");
+         }
+      } catch (Throwable t) {
+         LOGGER.warn("[standardsettings] failed to push client information", t);
+      }
+   }
+
+   /**
+    * 进入世界后重新套用所有通过 ClientInformation 下发的选项：
+    * 这些值只在下发瞬间被服务端接受，之前只在启动时应用，中途修改不会生效。
+    */
+   private static void applyClientInfoSettingsOnJoin() {
+      for (StandardSetting<?> setting : config.standardSettings) {
+         String id = setting.getID();
+         boolean clientInfo = "renderDistance".equals(id)
+            || "simulationDistance".equals(id)
+            || "chatVisibility".equals(id)
+            || "chatColors".equals(id)
+            || "mainHand".equals(id)
+            || "particles".equals(id)
+            || "allowServerListing".equals(id)
+            || id.startsWith("modelPart_");
+
+         if (clientInfo) {
+            setting.resetOption();
+            LOGGER.info("[standardsettings] re-applied {} on world join", id);
+         }
+      }
+   }
+
    public static void onWorldJoin() {
       onWorldJoinPending = false;
 
@@ -43,6 +84,8 @@ public class StandardSettings {
       }
 
       updateSettings();
+      applyClientInfoSettingsOnJoin();
+      pushClientInformation();
       LOGGER.info("Loaded StandardSettings on World Join");
    }
 
@@ -78,18 +121,11 @@ public class StandardSettings {
       }
    }
 
-   private static boolean videoModeApplied;
 
    public static void updateSettings() {
       Minecraft client = Minecraft.getInstance();
       Window window = client.getWindow();
 
-      // Recreating the swap surface on every world join made the game lose its window surface
-      // ("Cannot acquire minimized window") and swallow key input, so only touch it once per launch.
-      if (!videoModeApplied || Boolean.getBoolean("standardsettings.reapplyVideoMode")) {
-         videoModeApplied = true;
-         window.changeFullscreenVideoMode();
-      }
       boolean guiScaleChanged = window.getGuiScale() != (Integer)client.options.guiScale().get();
 
       if (guiScaleChanged) {

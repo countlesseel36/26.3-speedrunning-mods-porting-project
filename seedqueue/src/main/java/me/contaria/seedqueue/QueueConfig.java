@@ -113,7 +113,9 @@ public final class QueueConfig {
          }
 
          JsonObject json = GSON.fromJson(Files.readString(path), JsonObject.class);
-         queueSize = clamp(json.has("queueSize") ? json.get("queueSize").getAsInt() : queueSize, 1, 6);
+         // 上限不能写死：墙的格子数由 rows * columns 决定，这里只做基本保护，
+         // 真正的上限在加载末尾用 rows * columns 再夹一次。
+         queueSize = clamp(json.has("queueSize") ? json.get("queueSize").getAsInt() : queueSize, 1, 64);
          chunkRadius = clamp(json.has("chunkRadius") ? json.get("chunkRadius").getAsInt() : chunkRadius, 0, 8);
       showChunkProgress = json.has("showChunkProgress") ? json.get("showChunkProgress").getAsBoolean() : showChunkProgress;
       // "0" used to mean "follow the window"; it now falls back to the default preview resolution so

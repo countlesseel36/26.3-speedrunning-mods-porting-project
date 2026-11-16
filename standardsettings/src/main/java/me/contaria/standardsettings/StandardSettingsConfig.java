@@ -104,44 +104,6 @@ public class StandardSettingsConfig implements SpeedrunConfig {
       this.register("fov", "menu.options", options.fov());
       this.register("realmsNotifications", "options.online", options.realmsNotifications());
       this.register("allowServerListing", "options.online", options.allowServerListing());
-      this.register(
-         CustomStandardSetting.ofString(
-            "fullscreenResolution",
-            "options.video",
-            () -> Minecraft.getInstance().getWindow().getPreferredFullscreenVideoMode().<String>map(VideoMode::write).orElse(null),
-            value -> Minecraft.getInstance().getWindow().setPreferredFullscreenVideoMode(VideoMode.read(value)),
-            value -> (Component)VideoMode.read(value)
-               .map(mode -> Component.literal(mode.toString()))
-               .orElse(Component.translatable("options.fullscreen.current")),
-            setting -> {
-               Window window = Minecraft.getInstance().getWindow();
-               Monitor monitor = window.findBestMonitor();
-               int index;
-               if (monitor == null) {
-                  index = -1;
-               } else {
-                  index = VideoMode.read(setting.get()).<Integer>map(monitor::indexOfMode).orElse(-1);
-               }
-
-               OptionInstance<Integer> simpleOption = new OptionInstance<Integer>("options.fullscreen.resolution", OptionInstance.noTooltip(), (prefix, value) -> {
-                  if (monitor == null) {
-                     return Component.translatable("options.fullscreen.unavailable");
-                  } else {
-                     return value == -1 ? Component.translatable("options.fullscreen.current") : Component.literal(monitor.mode(value).toString());
-                  }
-               }, new IntRange(-1, monitor != null ? monitor.modeCount() - 1 : -1), index, value -> {
-                  if (monitor != null) {
-                     if (value == -1) {
-                        setting.set(null);
-                     } else {
-                        setting.set(monitor.mode(value).write());
-                     }
-                  }
-               });
-               return simpleOption.createButton(Minecraft.getInstance().options, 0, 0, 120);
-            }
-         )
-      );
       this.register("biomeBlendRadius", "options.video", options.biomeBlendRadius());
       this.register("renderDistance", "options.video", options.renderDistance());
       this.register("prioritizeChunkUpdates", "options.video", options.prioritizeChunkUpdates());
@@ -193,8 +155,6 @@ public class StandardSettingsConfig implements SpeedrunConfig {
       this.register("textureFiltering", "options.video", options.textureFiltering());
       this.register("maxAnisotropyBit", "options.video", options.maxAnisotropyBit());
       this.register("weatherRadius", "options.video", options.weatherRadius());
-      this.register("fullscreen", "options.video", options.fullscreen());
-      this.register("exclusiveFullscreen", "options.video", options.exclusiveFullscreen());
       this.register("particles", "options.video", options.particles());
       this.register("mipmapLevels", "options.video", options.mipmapLevels());
       this.register("entityShadows", "options.video", options.entityShadows());

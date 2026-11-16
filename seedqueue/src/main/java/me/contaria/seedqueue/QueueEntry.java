@@ -1263,6 +1263,32 @@ public final class QueueEntry {
 
    private void deleteWorldFolder() {
       try {
+         // 服务端 halt 后其 IO 线程可能仍在写 region 文件；此时删除会抛
+         // AccessDeniedException，并在游戏里弹出"无法保存区块"。
+         // 这里先等文件锁释放，仍失败就把目录留给下次启动清理。
+         for (int attempt = 0; attempt < 5; attempt++) {
+            try {
+               this.deleteWorldFolderNow();
+               return;
+            } catch (java.nio.file.AccessDeniedException retry) {
+               if (attempt == 4) {
+                  SeedQueue.LOGGER.warn(
+                     "[seedqueue] world folder for entry #{} is still in use, leaving it for the next launch",
+                     number
+                  );
+                  return;
+               }
+
+               Thread.sleep(400L);
+            }
+         }
+      } catch (Throwable t) {
+         SeedQueue.LOGGER.warn("[seedqueue] failed to delete world folder #{}", number, t);
+      }
+   }
+
+   private void deleteWorldFolderNow() throws java.io.IOException {
+      try {
          if (worldDirectory != null
             && hasPlayerData(worldDirectory)) {
             SeedQueue.LOGGER.info("[seedqueue] not deleting {} (contains player data)", worldDirectory.getFileName());
