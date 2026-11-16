@@ -25,6 +25,11 @@ public class StandardSettings {
    public static boolean autoF3EscPending;
 
    public static void reset() {
+      if (!isEnabled()) {
+         LOGGER.info("StandardSettings disabled, skipping reset");
+         return;
+      }
+
       config.update();
 
       for (StandardSetting<?> setting : config.standardSettings) {
@@ -79,6 +84,11 @@ public class StandardSettings {
    public static void onWorldJoin() {
       onWorldJoinPending = false;
 
+      if (!isEnabled()) {
+         return;
+      }
+
+
       for (StandardSetting<?> setting : config.standardSettingsOnWorldJoin) {
          setting.resetOption();
       }
@@ -106,6 +116,12 @@ public class StandardSettings {
       }
 
       Minecraft client = Minecraft.getInstance();
+
+      if (!isEnabled()) {
+         // 关闭时不要自动套用任何设置（否则配置页的开关等于无效）
+         lastAppliedLevel = client.level;
+         return;
+      }
 
       if (!appliedAtStartup) {
          appliedAtStartup = true;

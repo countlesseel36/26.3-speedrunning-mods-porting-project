@@ -2352,6 +2352,8 @@ public final class SeedQueue implements ClientModInitializer {
 
    public static void tick(Minecraft minecraft) {
       SodiumLevelCache.processPending();
+      // 世界目录删除：每 tick 最多一个，实际删除在后台执行
+      processPendingDeletions();
 
       // Re-assert the wall after a return: vanilla's disconnect completion sets the title screen on a
       // later tick and used to swallow it (F6 from the F3+Esc pause ended on the title screen).
@@ -3390,9 +3392,11 @@ public final class SeedQueue implements ClientModInitializer {
       boolean wallOpen = minecraft.gui.screen() instanceof WallScreen;
       boolean idle = !wallOpen && (minecraft.gui.screen() instanceof TitleScreen || minecraft.level != null);
 
-      long unlockedEntries = ENTRIES.stream().filter(entry -> !entry.locked).count();
+      // 锁定实例同样占用槽位：只按 unlocked 计数会补出超过队列容量的实例（实测 13/10）
+      long occupied = ENTRIES.size();
+      int capacity = Math.max(1, QueueConfig.rows * QueueConfig.columns);
 
-      if (idle && unlockedEntries < queueSize() && QueueConfig.autoQueue) {
+      if (idle && occupied < queueSize() && occupied < capacity && QueueConfig.autoQueue && canQueueAnother()) {
          QueueEntry entry = new QueueEntry(nextEntryNumber++, RANDOM.nextLong());
          ENTRIES.add(entry);
          LOGGER.info("[seedqueue] queued entry #{} (seed {})", entry.number, entry.seed);
@@ -3505,6 +3509,81 @@ public final class SeedQueue implements ClientModInitializer {
       }
 
       return discarded;
+   }
+
+   /** 限制同一时刻的实例创建节奏，避免一次性启动多个服务端。 */
+   private static long lastQueueAt;
+
+   private static boolean canQueueAnother() {
+      long now = System.currentTimeMillis();
+
+      if (now - lastQueueAt < 500L) {
+         return false;
+      }
+
+      lastQueueAt = now;
+      return true;
+   }
+
+   /** 待删除的世界目录：删除放到后台，且每 tick 只处理一个，避免回墙时集中卡顿。 */
+   private static final java.util.concurrent.ConcurrentLinkedQueue<java.nio.file.Path> PENDING_DELETES =
+      new java.util.concurrent.ConcurrentLinkedQueue<>();
+
+   private static final java.util.concurrent.ConcurrentHashMap<java.nio.file.Path, Long> DELETE_ENQUEUED_AT =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+   public static void enqueueWorldDeletion(java.nio.file.Path worldDirectory) {
+      if (worldDirectory != null && DELETE_ENQUEUED_AT.putIfAbsent(worldDirectory, System.currentTimeMillis()) == null) {
+         PENDING_DELETES.add(worldDirectory);
+      }
+   }
+
+   private static void processPendingDeletions() {
+      java.nio.file.Path dir = PENDING_DELETES.poll();
+
+      if (dir == null) {
+         return;
+      }
+
+      // 服务端 halt 后 IO 线程仍在写 region，立刻删必定 AccessDenied。
+      // 等 3 秒再尝试（期间放回队尾，每 tick 只轮询一次）。
+      Long enqueuedAt = DELETE_ENQUEUED_AT.get(dir);
+      long now = System.currentTimeMillis();
+
+      if (enqueuedAt != null && now - enqueuedAt < 3000L) {
+         PENDING_DELETES.add(dir);
+         return;
+      }
+
+      DELETE_ENQUEUED_AT.remove(dir);
+
+      try {
+         QueueExecutors.prepare().execute(() -> {
+            // 玩过的世界绝不能删：标记/玩家数据检查放在真正删除的那一刻
+            if (me.contaria.seedqueue.QueueEntry.hasPlayerData(dir)) {
+               LOGGER.info("[seedqueue] keeping {} (played or contains player data)", dir.getFileName());
+               return;
+            }
+
+            try {
+               try (var paths = java.nio.file.Files.walk(dir)) {
+                  paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                     try {
+                        java.nio.file.Files.deleteIfExists(path);
+                     } catch (Throwable ignored) {
+                     }
+                  });
+               }
+
+               LOGGER.info("[seedqueue] deleted world folder {}", dir.getFileName());
+            } catch (Throwable t) {
+               // 仍被占用就交给下次启动清理，不在这里反复重试刷屏
+               LOGGER.warn("[seedqueue] could not delete {}, leaving it for the next launch", dir.getFileName());
+            }
+         });
+      } catch (Throwable t) {
+         LOGGER.warn("[seedqueue] could not schedule deletion of {}", dir.getFileName(), t);
+      }
    }
 
    private static long lastPruneAt;
@@ -3746,7 +3825,9 @@ public final class SeedQueue implements ClientModInitializer {
          ? Math.max(queueSize(), Integer.getInteger("seedqueue.benchmarkConcurrency", QueueConfig.benchmarkConcurrency > 0 ? QueueConfig.benchmarkConcurrency : queueSize()))
          : queueSize();
 
-      while (occupied < target) {
+      // 每次只补一个：一次性补齐会在同一刻启动多个服务端（各自加载 1866 个进度），
+      // 造成渲染线程长时间无响应。后续 tick 会继续补到目标值。
+      if (occupied < target) {
          QueueEntry entry = new QueueEntry(nextEntryNumber++, RANDOM.nextLong());
          ENTRIES.add(entry);
          occupied++;
@@ -3757,7 +3838,6 @@ public final class SeedQueue implements ClientModInitializer {
          } catch (Throwable t) {
             LOGGER.warn("[seedqueue] could not queue entry #{} (executor stopped)", entry.number, t);
             ENTRIES.remove(entry);
-            break;
          }
       }
    }
