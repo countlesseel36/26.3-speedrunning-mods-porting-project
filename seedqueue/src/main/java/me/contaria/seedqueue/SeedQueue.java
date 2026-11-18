@@ -2354,6 +2354,7 @@ public final class SeedQueue implements ClientModInitializer {
       SodiumLevelCache.processPending();
       // 世界目录删除：每 tick 最多一个，实际删除在后台执行
       processPendingDeletions();
+      resumePausedGeneration();
 
       // Re-assert the wall after a return: vanilla's disconnect completion sets the title screen on a
       // later tick and used to swallow it (F6 from the F3+Esc pause ended on the title screen).
@@ -3535,6 +3536,19 @@ public final class SeedQueue implements ClientModInitializer {
    public static void enqueueWorldDeletion(java.nio.file.Path worldDirectory) {
       if (worldDirectory != null && DELETE_ENQUEUED_AT.putIfAbsent(worldDirectory, System.currentTimeMillis()) == null) {
          PENDING_DELETES.add(worldDirectory);
+      }
+   }
+
+   /** 回到墙上后，把世界里被中断的生成接上。 */
+   private static void resumePausedGeneration() {
+      if (isBackgroundGenerationPaused()) {
+         return;
+      }
+
+      for (QueueEntry entry : ENTRIES) {
+         if (entry.genPausedForPlay) {
+            entry.resumeGeneration();
+         }
       }
    }
 

@@ -1,0 +1,171 @@
+26.3 速通模组包 使用说明
+========================================
+
+一、这是什么
+----------------------------------------
+这是把 1.16.1 / 1.21.4 的速通常用模组移植到 Minecraft 26.3 的本地构建版本：
+  SeedQueue        队列预生成（墙上同时预生成多个世界，进入瞬间加载）
+  WorldPreview     世界预览（卡片上显示真实地形）
+  SpeedrunAPI      配置界面与配置存储的公共库
+  StandardSettings 统一设置（进入世界时套用固定选项）
+  Atum             自动重开（金靴子重置）
+  FastReset        快速退出（跳过保存直接回标题）
+
+【重要】本项目为纯 AI（LLM）生成移植，无人工代码审查，无法保证与原版逻辑一致，
+可能存在未知 Bug 或改变原版游戏机制。仅供娱乐，未经速通社区（MCSR）合法性认证，
+严禁用于提交任何排行榜成绩。
+
+
+二、安装
+----------------------------------------
+1. Minecraft 26.3 + Fabric Loader 0.19.5 或更高
+2. 建议同时安装 Sodium 0.9.3（预览与性能都依赖它）
+3. 把 6 个 jar 放进 .minecraft/mods/
+4. 删除 mods 里旧版本的同名 jar，不要同时放两个版本
+5. 启动游戏，日志里应出现：
+   [seedqueue] SeedQueue 26.3 port initialised (...)
+   [standardsettings] Loaded StandardSettings
+
+
+三、SeedQueue：墙（Wall）与键位
+----------------------------------------
+打开墙：在标题界面点右上角的「SeedQueue」按钮。
+关闭墙：墙上按 Esc。
+从世界里回到墙：按 F6（不保存、直接回墙）。
+注意：F6 只用于“返回墙”，不用于“打开墙”。
+
+墙上默认键位（配置 → SeedQueue 可改）：
+  R   进入选中的实例
+  L   锁定/解锁选中的实例（锁定的实例不会被自动重置）
+  E   重置选中的实例
+  T   重置所有未锁定实例
+  F   重置当前聚焦的实例
+  G   计划进入（实例就绪后自动进入）
+  H   计划全部（所有锁定实例就绪后依次进入）
+  J   重置一整行
+  K   重置一整列
+  M   进入下一个锁定实例（世界里按也有效）
+  F6  返回墙（只在已进入的世界里有效，跳过保存直接回墙）
+  B   开始跑分
+  N   取消跑分
+  Esc 关闭墙
+
+鼠标：
+  左键  进入
+  右键  锁定
+  中键  丢弃
+
+说明：
+  - 按 M 后会锁住墙上输入，直到进入完成，避免连续切换导致卡死；
+  - 连续按 M 有 2~3 秒冷却，属正常保护。
+
+
+四、SeedQueue 配置
+----------------------------------------
+路径：.minecraft/config/seedqueue.json（也可在配置界面改）
+
+常用项：
+  queueSize        同时预生成的实例数（受墙的 行×列 限制）
+  chunkRadius      每个实例预生成的区块半径（越小越快）
+  rows / columns   墙的格子数
+  useWall          是否使用墙（关掉则像原版一样直接进世界）
+  deleteDiscardedWorlds  丢弃时删除临时世界（默认开）
+  maxGeneratingCount     同时生成上限，0 = 不限制
+  wallFps / previewFps   墙与预览的帧率上限
+
+性能建议：
+  - 实例数 6~8 比较稳；10 以上需要更大内存；
+  - chunkRadius 2 已足够预览，调大只增加生成时间；
+  - 进世界游玩时后台只保留 1 个生成任务（自动）。
+
+
+五、WorldPreview：预览
+----------------------------------------
+- 卡片上的画面来自真实世界，不是截图；
+- 预览在后台服务端生成，进入世界时直接交接，因此“秒进”；
+- 第三人称预览已被关闭（会导致卡片画面不完整），固定用第一人称视角；
+- 已知问题：远景仍为黑色、偶尔地形闪烁。
+
+
+六、StandardSettings：统一设置
+----------------------------------------
+路径：.minecraft/config/mcsr/standardsettings.json
+
+作用：把一整套选项（渲染距离、模拟距离、FOV、按键、粒子、聊天设置…）
+固化成“进入世界时自动套用”。
+
+关键行为：
+  - 顶部开关 “Use StandardSettings” 关闭后完全不自动套用；
+  - 只有“新世界”（SeedQueue 队列实例 / Atum 重开）才套用；
+  - 点进已有存档不会改你的设置；
+  - 切换维度（下界/末地）不会重置设置；
+  - 渲染距离、模拟距离等会同步给服务端（日志：pushed client information）。
+
+
+七、Atum：自动重开
+----------------------------------------
+- 装 SeedQueue 时，重开由 SeedQueue 接管（F6 回墙 + M 进入下一个锁定实例）；
+- 不装 SeedQueue 时，F6 为 Atum 的重置键（金靴子）；
+- 配置：.minecraft/config/atum/atum.properties
+- 死亡界面退出到标题会停止重开链。
+
+
+八、FastReset：快速退出
+----------------------------------------
+- 退出世界时跳过保存，直接回到标题/墙，减少等待；
+- 与 SeedQueue 配合：回墙时不写盘，避免卡在 “Saving world”；
+- 配置：.minecraft/config/fastReset/settings.txt
+- 注意：跳过保存意味着本次未保存的进度会丢失，这是设计行为。
+
+
+九、常见问题
+----------------------------------------
+1) 回到墙时短暂卡顿
+   → 已在 build 中限制“每次只创建 1 个实例”，并让世界删除在后台进行。
+     若仍明显，减少 queueSize 或提高 JVM 内存。
+
+2) 偶发卡顿（GC）
+   → 建议 JVM 参数：-Xms8G -Xmx8G -XX:+UseG1GC -XX:MaxGCPauseMillis=50
+     31G 内存的机器建议 -Xmx6G~8G，不要给到 12G 以上。
+
+3) 实例数超过设定值（如 13/10）
+   → 已修复；若复现请确认版本 ≥ 1.0.0-rc.5。
+
+4) 弹出“无法保存 XXX 处的区块”
+   → 世界目录在服务端写盘时被删除导致；已改为延迟 3 秒 + 后台删除。
+
+5) 游戏未响应 / 崩溃
+   → 先看 .minecraft/logs/latest.log 与 hs_err_pid*.log；
+     若安装了注入类工具（录屏、加速器、Toolscreen 等），先关闭再试。
+
+6) 世界列表里出现大量 SeedQueue-* 目录
+   → 临时队列世界，正常丢弃会自动清理；异常退出留下的会在下次启动清理，
+     带 seedqueue_played.marker 的（你进入过的）会永久保留。
+
+7) 手动创建世界卡在 Preparing for world creation
+   → 已修复：手动创建不再被队列接管；若复现请升级到最新构建。
+
+
+十、文件位置速查
+----------------------------------------
+  mods/                         模组 jar
+  config/seedqueue.json         SeedQueue 配置
+  config/mcsr/standardsettings.json   StandardSettings 配置
+  config/atum/atum.properties   Atum 配置
+  config/fastReset/settings.txt FastReset 配置
+  saves/                        世界存档（SeedQueue-* 为队列世界）
+  logs/latest.log               最新日志
+  crash-reports/                崩溃报告
+  hs_err_pid*.log               JVM 级崩溃日志
+
+
+十一、版本
+----------------------------------------
+SeedQueue        1.0.0-rc.6
+WorldPreview     6.3.0-rc.1
+SpeedrunAPI      2.1.0-rc.4
+StandardSettings 2.3.0-rc.6（本地构建）
+Atum             1.4.0-rc.2
+FastReset        1.6.0-rc.1
+
+祝速通愉快。

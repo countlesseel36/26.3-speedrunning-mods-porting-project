@@ -23,6 +23,8 @@ public class KeyboardHandlerMixin {
    private void seedqueue$backToWallKey(long window, int key, KeyEvent event, CallbackInfo ci) {
       Minecraft client = Minecraft.getInstance();
 
+
+
       // 进入实例的过渡期间，Esc 会把标题/暂停界面设回来并卡住游戏
       if (SeedQueue.isTransitionPending() && event.isEscape()) {
          ci.cancel();

@@ -81,10 +81,44 @@ public class StandardSettings {
       }
    }
 
+   /** 当前单人世界目录（多人游戏返回 null）。 */
+   private static java.nio.file.Path currentWorldDirectory() {
+      try {
+         var server = Minecraft.getInstance().getSingleplayerServer();
+
+         if (server == null) {
+            return null;
+         }
+
+         return server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT);
+      } catch (Throwable ignored) {
+         return null;
+      }
+   }
+
+   /**
+    * 只有"全新世界"才自动套用设置：判断依据是世界目录里没有 standardoptions.txt。
+    * 点进已有存档（目录里已有该文件）不应该被动改设置；也不依赖 SeedQueue 的赋值时序。
+    */
+   private static boolean isAutoApplyWorld() {
+      java.nio.file.Path dir = currentWorldDirectory();
+
+      if (dir == null) {
+         return true;   // 多人游戏/无服务器：保持原行为
+      }
+
+      return !java.nio.file.Files.exists(dir.resolve("standardoptions.txt"));
+   }
+
    public static void onWorldJoin() {
       onWorldJoinPending = false;
 
       if (!isEnabled()) {
+         return;
+      }
+
+      if (!isAutoApplyWorld()) {
+         LOGGER.info("StandardSettings: existing world, not applying settings");
          return;
       }
 
@@ -101,6 +135,8 @@ public class StandardSettings {
 
    private static boolean appliedAtStartup;
    private static Object lastAppliedLevel;
+   private static Object lastAppliedPlayer;
+   private static Object lastAppliedConnection;
 
    /**
     * Applies the configured defaults once at startup and again whenever a world is joined.
@@ -120,6 +156,7 @@ public class StandardSettings {
       if (!isEnabled()) {
          // 关闭时不要自动套用任何设置（否则配置页的开关等于无效）
          lastAppliedLevel = client.level;
+         lastAppliedPlayer = client.player;
          return;
       }
 
@@ -128,12 +165,21 @@ public class StandardSettings {
          reset();
       }
 
-      if (client.level != lastAppliedLevel) {
+      // 切换维度时客户端会重建 ClientLevel **和** LocalPlayer，只有"连接对象"保持不变。
+      // 用连接判断：换连接 = 真正进入新世界；同连接 = 维度切换/重生，不应重置设置。
+      Object connection = client.getConnection();
+
+      if (connection != lastAppliedConnection) {
+         lastAppliedConnection = connection;
+         lastAppliedPlayer = client.player;
          lastAppliedLevel = client.level;
 
-         if (client.level != null) {
+         if (connection != null && client.player != null && client.level != null) {
             onWorldJoin();
          }
+      } else {
+         lastAppliedPlayer = client.player;
+         lastAppliedLevel = client.level;
       }
    }
 

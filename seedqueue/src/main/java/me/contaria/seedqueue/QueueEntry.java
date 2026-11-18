@@ -392,7 +392,9 @@ public final class QueueEntry {
          }
 
          previewPixels = pixels;
-         SeedQueue.LOGGER.info("[seedqueue] rendered perspective preview for #{} ({}x{})", number, previewWidth, previewHeight);
+         SeedQueue.LOGGER.info(
+            "[seedqueue] rendered perspective preview for #{} (seed {}, {}x{})",
+            number, seed, previewWidth, previewHeight);
       } catch (Throwable t) {
          SeedQueue.LOGGER.warn("[seedqueue] failed to render perspective preview for #{}", number, t);
       }
@@ -463,6 +465,17 @@ public final class QueueEntry {
     * captured, the entry becomes READY and the remaining chunks generate on demand when it is played.
     * Locking/scheduling/playing it (or resumeOnFilledQueue) sets forceFinish so it keeps going to 100%.
     */
+   /** 因为玩家在世界里而中断了生成：回到墙上后需要续跑。 */
+   public volatile boolean genPausedForPlay;
+
+   /** 回到墙上后续跑被中断的生成。 */
+   public void resumeGeneration() {
+      if (this.genPausedForPlay && this.server != null && this.state == State.PREPARING) {
+         this.genPausedForPlay = false;
+         this.server.execute(this::generateStep);
+      }
+   }
+
    public boolean waitForGenerationPermit() {
       synchronized (this.generationGate) {
          while (this.state != State.DISCARDED && !this.selected) {
@@ -737,6 +750,12 @@ public final class QueueEntry {
                   }
 
                   if (state == State.DISCARDED) {
+                     return;
+                  }
+
+                  // 玩家在世界里时让出 CPU：保存进度后中断循环，回到墙上再由 tick 续跑
+                  if (me.contaria.seedqueue.SeedQueue.isBackgroundGenerationPaused()) {
+                     this.genPausedForPlay = true;
                      return;
                   }
 

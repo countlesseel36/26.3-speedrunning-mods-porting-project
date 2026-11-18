@@ -14,10 +14,10 @@
 
 | 模组 / Mod | 版本 / Version | 说明 / Description |
 | --- | --- | --- |
-| SeedQueue | `1.0.0-rc.6+26.3` | 后台生成世界 + 墙界面预览 / Background world generation + wall previews |
+| SeedQueue | `1.0.0-rc.7+26.3` | 后台生成世界 + 墙界面预览 / Background world generation + wall previews |
 | WorldPreview | `6.3.0-rc.1+26.3` | 预览渲染管线 / Preview rendering pipeline |
 | SpeedrunAPI | `2.1.0-rc.4+26.3` | 配置界面框架 / Config screen framework |
-| StandardSettings | `2.3.0-rc.4+26.3` | 进世界应用预设选项 / Applies preset options on world join |
+| StandardSettings | `2.3.0-rc.7+26.3` | 进世界应用预设选项 / Applies preset options on world join |
 | Atum | `1.4.0-rc.2+26.3` | 自动重置 / Auto reset |
 | FastReset | `1.6.0-rc.1+26.3` | 秒退到标题 / Instant quit to title |
 
