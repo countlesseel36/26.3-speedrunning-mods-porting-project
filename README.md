@@ -146,8 +146,8 @@ powershell -File .\build.ps1 -Mod all
 
 ## 致谢 / Credits
 
-- 感谢 **ttkuilei** 的实测与反馈：改键持久化、鼠标绑定失效、配置页分组与顺序、显存泄漏与掉线等问题均来自其测试报告。
-  / Thanks to **ttkuilei** for testing and reporting: the key persistence, broken mouse bindings, config grouping/ordering, VRAM leak and disconnect issues all came from their reports.
+- 感谢 **ttkuilei**、**fakem0n**、**¡¡upiarotusaraK** 的测试与反馈。
+  / Thanks to **ttkuilei**, **fakem0n** and **¡¡upiarotusaraK** for testing and feedback.
 
 ## 说明 / Notes
 

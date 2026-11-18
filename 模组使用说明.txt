@@ -118,35 +118,7 @@
 - 注意：跳过保存意味着本次未保存的进度会丢失，这是设计行为。
 
 
-九、常见问题
-----------------------------------------
-1) 回到墙时短暂卡顿
-   → 已在 build 中限制“每次只创建 1 个实例”，并让世界删除在后台进行。
-     若仍明显，减少 queueSize 或提高 JVM 内存。
-
-2) 偶发卡顿（GC）
-   → 建议 JVM 参数：-Xms8G -Xmx8G -XX:+UseG1GC -XX:MaxGCPauseMillis=50
-     31G 内存的机器建议 -Xmx6G~8G，不要给到 12G 以上。
-
-3) 实例数超过设定值（如 13/10）
-   → 已修复；若复现请确认版本 ≥ 1.0.0-rc.5。
-
-4) 弹出“无法保存 XXX 处的区块”
-   → 世界目录在服务端写盘时被删除导致；已改为延迟 3 秒 + 后台删除。
-
-5) 游戏未响应 / 崩溃
-   → 先看 .minecraft/logs/latest.log 与 hs_err_pid*.log；
-     若安装了注入类工具（录屏、加速器、Toolscreen 等），先关闭再试。
-
-6) 世界列表里出现大量 SeedQueue-* 目录
-   → 临时队列世界，正常丢弃会自动清理；异常退出留下的会在下次启动清理，
-     带 seedqueue_played.marker 的（你进入过的）会永久保留。
-
-7) 手动创建世界卡在 Preparing for world creation
-   → 已修复：手动创建不再被队列接管；若复现请升级到最新构建。
-
-
-十、文件位置速查
+九、文件位置速查
 ----------------------------------------
   mods/                         模组 jar
   config/seedqueue.json         SeedQueue 配置
@@ -159,12 +131,12 @@
   hs_err_pid*.log               JVM 级崩溃日志
 
 
-十一、版本
+十、版本
 ----------------------------------------
-SeedQueue        1.0.0-rc.6
+SeedQueue        1.0.0-rc.7
 WorldPreview     6.3.0-rc.1
 SpeedrunAPI      2.1.0-rc.4
-StandardSettings 2.3.0-rc.6（本地构建）
+StandardSettings 2.3.0-rc.7
 Atum             1.4.0-rc.2
 FastReset        1.6.0-rc.1
 
