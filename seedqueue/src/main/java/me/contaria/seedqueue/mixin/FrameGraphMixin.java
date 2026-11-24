@@ -1,11 +1,12 @@
 package me.contaria.seedqueue.mixin;
 
 import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
+import com.mojang.blaze3d.framegraph.FrameGraphBuilder.Inspector;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
 import com.mojang.blaze3d.resource.ResourceHandle;
 import java.util.List;
-import me.contaria.seedqueue.WallPreview;
+import me.contaria.seedqueue.wall.WallPreview;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -13,53 +14,45 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import me.contaria.seedqueue.*;
+import me.contaria.seedqueue.queue.*;
+import me.contaria.seedqueue.preview.*;
+import me.contaria.seedqueue.wall.*;
+import me.contaria.seedqueue.render.*;
+import me.contaria.seedqueue.config.*;
 
-/**
- * Redirects the frame graph's {@code "main"} external resource to the instance target that is
- * currently being rendered.
- *
- * <p>{@code LevelRenderer.render} builds its graph as
- * {@code frameGraph.importExternal("main", gameRenderer.mainRenderTarget())} and every level pass
- * (clear, sky, main, post chains) resolves the attachment through the handle returned here. The
- * graph is built and executed synchronously inside {@code renderLevel}, so redirecting this single
- * call is enough to make the whole level land in our target, even when another mod bypasses
- * {@code mainRenderTarget()} or keeps a stale field.</p>
- */
-@Mixin(FrameGraphBuilder.class)
+@Mixin({FrameGraphBuilder.class})
 public abstract class FrameGraphMixin {
    @Shadow
    @Final
    private List<?> passes;
 
-   @Inject(method = "importExternal", at = @At("HEAD"), cancellable = true)
-   private void seedqueue$redirectMain(String name, Object resource, CallbackInfoReturnable<ResourceHandle<?>> cir) {
+   @Inject(
+      method = {"importExternal"},
+      at = {@At("HEAD")},
+      cancellable = true
+   )
+   private void seedqueue$redirectMain(String text, Object obj, CallbackInfoReturnable<ResourceHandle<?>> callback) {
       RenderTarget target = WallPreview.activeTarget();
+      if (target != null && !WallPreview.redirecting()) {
+         WallPreview.logImport(text, obj);
+         if ("main".equals(text)) {
+            WallPreview.setRedirecting(true);
 
-      if (target == null || WallPreview.redirecting()) {
-         return;
-      }
-
-      WallPreview.logImport(name, resource);
-
-      if (!"main".equals(name)) {
-         return;
-      }
-
-      // Re-enter importExternal with our target; the guard keeps the second call from recursing.
-      WallPreview.setRedirecting(true);
-
-      try {
-         cir.setReturnValue(((FrameGraphBuilder)(Object)this).importExternal(name, target));
-      } finally {
-         WallPreview.setRedirecting(false);
+            try {
+               callback.setReturnValue((((FrameGraphBuilder)(Object)this)).importExternal(text, target));
+            } finally {
+               WallPreview.setRedirecting(false);
+            }
+         }
       }
    }
 
    @Inject(
-      method = "execute(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;Lcom/mojang/blaze3d/framegraph/FrameGraphBuilder$Inspector;)V",
-      at = @At("HEAD")
+      method = {"execute(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;Lcom/mojang/blaze3d/framegraph/FrameGraphBuilder$Inspector;)V"},
+      at = {@At("HEAD")}
    )
-   private void seedqueue$logPasses(GraphicsResourceAllocator allocator, FrameGraphBuilder.Inspector inspector, CallbackInfo ci) {
+   private void seedqueue$logPasses(GraphicsResourceAllocator graphicsResourceAllocator, Inspector inspector, CallbackInfo callback) {
       WallPreview.logPasses(this.passes);
    }
 }

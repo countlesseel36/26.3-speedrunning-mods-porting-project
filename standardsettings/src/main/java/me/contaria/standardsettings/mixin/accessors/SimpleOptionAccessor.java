@@ -14,11 +14,11 @@ public interface SimpleOptionAccessor<T> {
 
    @Mutable
    @Accessor("toString")
-   void standardsettings$setTextGetter(Function<T, Component> var1);
+   void standardsettings$setTextGetter(Function<T, Component> textGetter);
 
    @Accessor("caption")
    Component standardsettings$getText();
 
    @Accessor("value")
-   void standardsettings$setValue(T var1);
+   void standardsettings$setValue(T value);
 }

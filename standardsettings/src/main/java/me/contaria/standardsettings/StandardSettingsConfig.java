@@ -75,6 +75,9 @@ import net.minecraft.world.entity.player.PlayerModelPart;
 import org.apache.commons.lang3.ArrayUtils;
 
 @Config(init = InitPoint.POSTLAUNCH)
+/**
+ * 标准设置配置容器：注册各设置项、读写 JSON、构建配置界面。
+ */
 public class StandardSettingsConfig implements SpeedrunConfig {
    @Ignored
    public final List<StandardSetting<?>> standardSettings = new ArrayList<>();
@@ -112,6 +115,9 @@ public class StandardSettingsConfig implements SpeedrunConfig {
       this.register("maxFps", "options.video", options.framerateLimit());
       this.register("enableVsync", "options.video", options.enableVsync());
       this.register("inactivityFpsLimit", "options.video", options.inactivityFpsLimit());
+      /**
+       * 注册一个标准设置项。
+       */
       this.register(new SimpleOptionStandardSetting<Integer>("guiScale", "options.video", options.guiScale()) {
          public void set(OptionInstance<Integer> option, Integer value) {
             ((SimpleOptionAccessor)(Object)option).standardsettings$setValue(Math.max(0, value));
@@ -356,6 +362,9 @@ public class StandardSettingsConfig implements SpeedrunConfig {
       this.onWorldJoin(new SimpleOptionStandardSetting("fovOnWorldJoin", "onWorldJoin", options.fov())).disable();
       this.onWorldJoin(new SimpleOptionStandardSetting("renderDistanceOnWorldJoin", "onWorldJoin", options.renderDistance())).disable();
       this.onWorldJoin(new SimpleOptionStandardSetting("entityDistanceScalingOnWorldJoin", "onWorldJoin", options.entityDistanceScaling())).disable();
+      /**
+       * 世界加入时对设置项执行回调。
+       */
       this.onWorldJoin(new SimpleOptionStandardSetting<Integer>("guiScaleOnWorldJoin", "onWorldJoin", options.guiScale()) {
          public void set(OptionInstance<Integer> option, Integer value) {
             ((SimpleOptionAccessor)(Object)option).standardsettings$setValue(Math.max(0, value));
@@ -446,6 +455,9 @@ public class StandardSettingsConfig implements SpeedrunConfig {
       );
    }
 
+   /**
+    * 解析配置字段并生成设置项。
+    */
    public SpeedrunOption<?> parseField(Field field, SpeedrunConfig config, String... idPrefix) {
       return "toggleAll".equals(field.getName())
          ? new Builder(this, this, field, idPrefix)
@@ -460,6 +472,9 @@ public class StandardSettingsConfig implements SpeedrunConfig {
          : SpeedrunConfig.super.parseField(field, config, idPrefix);
    }
 
+   /**
+    * 完成配置初始化（补齐缺失项）。
+    */
    public void finishInitialization(SpeedrunConfigContainer<?> container) {
       this.configContainer = container;
       this.fileLastModified = this.getConfigFile().lastModified();
@@ -530,6 +545,9 @@ public class StandardSettingsConfig implements SpeedrunConfig {
       return this.focusedKeyBinding != null;
    }
 
+   /**
+    * 构建标准设置配置界面。
+    */
    public Screen createConfigScreen(Screen parent) {
       this.update();
       return SpeedrunConfig.super.createConfigScreen(parent);

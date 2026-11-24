@@ -1,33 +1,34 @@
 package me.contaria.seedqueue.mixin;
 
 import java.util.function.BooleanSupplier;
-import me.contaria.seedqueue.QueueEntry;
-import me.contaria.seedqueue.QueueServer;
+import me.contaria.seedqueue.queue.QueueEntry;
+import me.contaria.seedqueue.queue.QueueServer;
+import me.contaria.seedqueue.SeedQueue;
 import net.minecraft.client.server.IntegratedServer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import me.contaria.seedqueue.*;
+import me.contaria.seedqueue.queue.*;
+import me.contaria.seedqueue.preview.*;
+import me.contaria.seedqueue.wall.*;
+import me.contaria.seedqueue.render.*;
+import me.contaria.seedqueue.config.*;
 
-/**
- * Freezes a queued instance once it finished loading: the background server thread blocks at the
- * start of every tick, so the world stays fully loaded and in memory while using no CPU. Selecting
- * the entry releases it, which is what allows the instant hand-off.
- */
-@Mixin(IntegratedServer.class)
+@Mixin({IntegratedServer.class})
 public abstract class IntegratedServerParkMixin {
-   @Inject(method = "tickServer", at = @At("HEAD"))
-   private void seedqueue$parkWhileQueued(BooleanSupplier hasTimeLeft, CallbackInfo ci) {
+   @Inject(
+      method = {"tickServer"},
+      at = {@At("HEAD")}
+   )
+   private void seedqueue$parkWhileQueued(BooleanSupplier booleanSupplier, CallbackInfo callback) {
       QueueEntry entry = ((QueueServer)this).seedqueue$getEntry();
-
       if (entry != null) {
-         boolean wasParked = entry.parked;
+         boolean flag = entry.parked;
          entry.awaitUnpark();
-
-         if (wasParked) {
-            // "nextTickTimeNanos" lives on MinecraftServer, so it cannot be shadowed from a mixin into
-            // IntegratedServer; reset it through reflection instead of breaking mixin application.
-            me.contaria.seedqueue.SeedQueue.resetTickTiming(this);
+         if (flag) {
+            SeedQueue.resetTickTiming(this);
          }
       }
    }

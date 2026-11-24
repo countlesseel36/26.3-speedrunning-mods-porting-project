@@ -10,6 +10,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.multiplayer.CommonListenerCookie;
 import net.minecraft.client.multiplayer.LevelLoadTracker;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
@@ -211,35 +212,16 @@ public final class ExternalPreview {
       SodiumCompat.refreshTerrain();
    }
 
-   private boolean chunksApplied;
-   private boolean surfaceAdjusted;
-   private boolean spawnResolved;
-   private int packetCursor;
+   boolean chunksApplied;
+   boolean surfaceAdjusted;
+   boolean spawnResolved;
+   int packetCursor;
    public int spawnPosY;
 
 
    /** Applies chunks generated after the preview first appeared (progressive terrain). */
    public void applyNewPackets(java.util.List<ClientboundLevelChunkWithLightPacket> packets) {
-      if (packets == null || packets.isEmpty()) {
-         return;
-      }
-
-      SodiumCompat.setup(this.level);
-      int centerSectionY = this.spawn.getY() >> 4;
-
-      for (ClientboundLevelChunkWithLightPacket packet : packets) {
-         packet.handle(this.listener);
-         SodiumCompat.markLightReady(this.level, packet.x(), packet.z());
-      }
-
-      SodiumCompat.pumpChunkEvents();
-
-      for (ClientboundLevelChunkWithLightPacket packet : packets) {
-         SodiumCompat.rebuildColumn(this.level, packet.x(), packet.z(), centerSectionY);
-      }
-
-      SodiumCompat.pumpChunkEvents();
-      SodiumCompat.refreshTerrain();
+      PreviewSectionHelper.applyNewPackets(this, packets);
    }
 
    /**
@@ -256,13 +238,11 @@ public final class ExternalPreview {
     * card keeps showing an empty graph - the unrendered areas after F6.</p>
     */
    public void invalidateSections() {
-      this.chunksApplied = false;
-      this.packetCursor = 0;
-      this.lastActivationAt = System.currentTimeMillis();
+      PreviewSectionHelper.invalidateSections(this);
    }
 
    /** Timestamp of the last chunk re-application; cards stay on their previous frame until settled. */
-   private long lastActivationAt;
+   long lastActivationAt;
    private long completeSince;
 
    /**
@@ -310,8 +290,6 @@ public final class ExternalPreview {
     * The PlayerInfo profile is handed over as-is (not copied) because SkinManager keys its cache by
     * profile identity/properties; a copy never resolves to a skin.
     */
-   private static java.lang.reflect.Field playerInfoField;
-   private static boolean playerInfoResolved;
 
    /**
     * Hands the real player's {@code PlayerInfo} to a preview player.
@@ -321,188 +299,16 @@ public final class ExternalPreview {
     * cards had no skin. Copying the profile was not enough; the skin manager needs the same
     * {@code PlayerInfo} instance the real connection uses.</p>
     */
-   static void applyRealSkin(Minecraft minecraft, net.minecraft.client.player.LocalPlayer player) {
-      try {
-         var real = minecraft.getGameProfile();
-
-         if (real == null || player == null) {
-            return;
-         }
-
-         var connection = minecraft.getConnection();
-
-         if (connection == null) {
-            return;
-         }
-
-         var info = connection.getPlayerInfo(real.id());
-
-         if (info == null) {
-            return;
-         }
-
-         if (!playerInfoResolved) {
-            playerInfoResolved = true;
-
-            for (Class<?> type = player.getClass(); type != null; type = type.getSuperclass()) {
-               try {
-                  java.lang.reflect.Field field = type.getDeclaredField("playerInfo");
-                  field.setAccessible(true);
-                  playerInfoField = field;
-                  break;
-               } catch (NoSuchFieldException ignored) {
-               }
-            }
-         }
-
-         if (playerInfoField != null) {
-            playerInfoField.set(player, info);
-         }
-      } catch (Throwable t) {
-         WorldPreview.LOGGER.warn("[preview] could not apply the real player skin", t);
-      }
+   static  void applyRealSkin(Minecraft minecraft, net.minecraft.client.player.LocalPlayer player) {
+      PreviewSkinHelper.applyRealSkin(minecraft, player);
    }
 
-   static GameProfile previewProfile(Minecraft minecraft) {
-      try {
-         var real = minecraft.getGameProfile();
-
-         if (real != null) {
-            var connection = minecraft.getConnection();
-
-            if (connection != null) {
-               var info = connection.getPlayerInfo(real.id());
-
-               if (info != null && info.getProfile().properties().containsKey("textures")) {
-                  return info.getProfile();
-               }
-            }
-
-            return real;
-         }
-      } catch (Throwable t) {
-         WorldPreview.LOGGER.warn("[preview] could not read the local game profile", t);
-      }
-
-      return new GameProfile(UUID.nameUUIDFromBytes("worldpreview".getBytes()), "Preview");
+   static  GameProfile previewProfile(Minecraft minecraft) {
+      return PreviewSkinHelper.previewProfile(minecraft);
    }
 
    public void activateSections() {
-      int centerSectionY = this.spawn.getY() >> 4;
-      // Re-bind Sodium first: the renderer may have been restored to another level in between,
-      // and its chunk tracker calls crash when no section manager is bound.
-      SodiumCompat.setup(this.level);
-
-      if (!this.chunksApplied) {
-         this.level.getChunkSource().updateViewCenter(this.spawn.getX() >> 4, this.spawn.getZ() >> 4);
-         this.level.getChunkSource().updateViewRadius(this.radius + 2);
-
-         // Wall Data Limit: apply at most this many chunk packets per preview update, so a big
-         // snapshot does not cause a frame spike when a card is first shown.
-         int limit = Math.max(1, Integer.getInteger("seedqueue.wallDataLimit", 100));
-         int end = Math.min(this.packets.size(), this.packetCursor + limit);
-
-         for (int i = this.packetCursor; i < end; i++) {
-            ClientboundLevelChunkWithLightPacket packet = this.packets.get(i);
-            packet.handle(this.listener);
-            SodiumCompat.markLightReady(this.level, packet.x(), packet.z());
-         }
-
-         SodiumCompat.pumpChunkEvents();
-
-         for (int i = this.packetCursor; i < end; i++) {
-            ClientboundLevelChunkWithLightPacket packet = this.packets.get(i);
-            SodiumCompat.rebuildColumn(this.level, packet.x(), packet.z(), centerSectionY);
-         }
-
-         SodiumCompat.pumpChunkEvents();
-         this.packetCursor = end;
-
-         if (this.packetCursor >= this.packets.size()) {
-            this.chunksApplied = true;
-            this.lastActivationAt = System.currentTimeMillis();
-            SodiumCompat.refreshTerrain();
-         }
-      } else {
-         // The snapshot is already in the level and Sodium's tracker: on the next rotation just
-         // drain queued chunk events instead of re-sending every packet and rebuilding all sections.
-         SodiumCompat.pumpChunkEvents();
-      }
-
-      // Resolve the exact spawn the server will use (respawn_radius is 0 for queue worlds) and move the
-      // preview camera there; the raw respawn suggestion is off by up to the old search radius.
-      if (!this.spawnResolved && this.chunksApplied) {
-         this.spawnResolved = true;
-
-         BlockPos resolved = fixupSpawnHeight(this.level, this.spawn);
-
-         if (resolved != null && !resolved.equals(this.spawn)) {
-            WorldPreview.LOGGER.info("[preview] spawn resolved: {} -> {}", this.spawn, resolved);
-            this.spawn = resolved;
-            this.spawnPosY = resolved.getY();
-            this.surfaceAdjusted = true;
-            this.player.setPos(resolved.getX() + 0.5, resolved.getY(), resolved.getZ() + 0.5);
-            this.player.setOldPosAndRot();
-         }
-      }
-
-      // The first person preview has to stay on the real spawn block: only lift the player when the
-      // spawn position itself is inside a block (the old code always jumped to WORLD_SURFACE, which
-      // put the camera several blocks above the spawn - not the spawn view).
-      if (!this.surfaceAdjusted && this.chunksApplied) {
-         this.surfaceAdjusted = true;
-
-         try {
-            var feet = this.level.getBlockState(this.spawn);
-            var head = this.level.getBlockState(this.spawn.above());
-
-            if (!feet.isAir() || !head.isAir()) {
-               int surface = this.level.getHeight(
-                  net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, this.spawn.getX(), this.spawn.getZ()
-               );
-
-               if (surface > this.level.getMinY()) {
-                  this.player.setPos(this.spawn.getX() + 0.5, surface, this.spawn.getZ() + 0.5);
-                  this.player.setOldPosAndRot();
-                  this.spawnPosY = surface;
-               }
-            }
-
-            if (this.cameraAnchor != null) {
-                  // Sample the height of the camera's own column (three blocks south of spawn): using
-                  // the spawn height here can bury the camera inside a hill, which renders the cards
-                  // as a dark box with a bright sky ("black fog" look).
-                  int cameraX = this.spawn.getX();
-                  int cameraZ = this.spawn.getZ() - 3;
-                  int cameraY = this.level.getHeight(
-                     net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, cameraX, cameraZ
-                  );
-                  var cameraPos = new net.minecraft.core.BlockPos(cameraX, cameraY, cameraZ);
-
-                  for (int i = 0; i < 5 && !this.level.getBlockState(cameraPos).isAir(); i++) {
-                     cameraPos = cameraPos.above();
-                  }
-
-               this.cameraAnchor.setPos(cameraX + 0.5, cameraPos.getY() + 0.2, cameraZ + 0.5);
-               this.cameraAnchor.setOldPosAndRot();
-            }
-         } catch (Throwable t) {
-            WorldPreview.LOGGER.warn("[preview] failed to place the preview camera on the surface", t);
-         }
-      }
-
-      if (Boolean.getBoolean("worldpreview.cameraLog")) {
-         WorldPreview.LOGGER.info(
-            "[preview] spawn camera: spawn={} feet={} eye={} yaw={} pitch={} (thirdPerson={})",
-         this.spawn,
-         this.player.getY(),
-         this.player.getEyeY(),
-         this.player.getYRot(),
-            this.player.getXRot(),
-            this.cameraAnchor != null
-         );
-      }
-      WorldPreview.LOGGER.info("[preview] activated {} preview sections (sodium {})", this.packets.size(), SodiumCompat.stats());
+      PreviewSectionHelper.activateSections(this);
    }
 
 
@@ -514,93 +320,20 @@ public final class ExternalPreview {
     * {@code fixupSpawnHeight}. Running the same steps on the preview level gives exactly the block the
     * player will stand on, instead of the raw (and often wrong) respawn suggestion.</p>
     */
-   public static BlockPos resolveSpawn(ClientLevel level, BlockPos suggestion) {
-      try {
-         BlockPos levelSpawn = levelRespawnPos(level, suggestion.getX(), suggestion.getZ());
-
-         if (levelSpawn != null && noCollisionNoLiquid(level, levelSpawn)) {
-            return levelSpawn;
-         }
-      } catch (Throwable t) {
-         WorldPreview.LOGGER.warn("[preview] spawn column lookup failed", t);
-      }
-
-      try {
-         return fixupSpawnHeight(level, suggestion);
-      } catch (Throwable t) {
-         return suggestion;
-      }
+   public static  BlockPos resolveSpawn(ClientLevel level, BlockPos suggestion) {
+      return PreviewSpawnHelper.resolveSpawn(level, suggestion);
    }
 
-   private static BlockPos levelRespawnPos(ClientLevel level, int x, int z) {
-      var chunk = level.getChunk(
-         net.minecraft.core.SectionPos.blockToSectionCoord(x),
-         net.minecraft.core.SectionPos.blockToSectionCoord(z)
-      );
-      int topY = chunk.getHeight(
-         net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, x & 15, z & 15
-      );
-
-      if (topY < level.getMinY()) {
-         return null;
-      }
-
-      int surface = chunk.getHeight(
-         net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x & 15, z & 15
-      );
-
-      if (surface <= topY
-         && surface > chunk.getHeight(
-            net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR, x & 15, z & 15
-         )) {
-         return null;
-      }
-
-      var pos = new net.minecraft.core.BlockPos.MutableBlockPos();
-
-      for (int y = topY + 1; y >= level.getMinY(); y--) {
-         pos.set(x, y, z);
-         var state = level.getBlockState(pos);
-
-         if (!state.getFluidState().isEmpty()) {
-            break;
-         }
-
-         if (net.minecraft.world.level.block.Block.isFaceFull(
-            state.getCollisionShape(level, pos), net.minecraft.core.Direction.UP
-         )) {
-            return pos.above().immutable();
-         }
-      }
-
-      return null;
+   private static  BlockPos levelRespawnPos(ClientLevel level, int x, int z) {
+      return PreviewSpawnHelper.levelRespawnPos(level, x, z);
    }
 
-   private static net.minecraft.core.BlockPos fixupSpawnHeight(ClientLevel level, net.minecraft.core.BlockPos spawnPos) {
-      var pos = spawnPos.mutable();
-
-      while (!noCollisionNoLiquid(level, pos) && pos.getY() < level.getMaxY()) {
-         pos.move(net.minecraft.core.Direction.UP);
-      }
-
-      pos.move(net.minecraft.core.Direction.DOWN);
-
-      while (noCollisionNoLiquid(level, pos) && pos.getY() > level.getMinY()) {
-         pos.move(net.minecraft.core.Direction.DOWN);
-      }
-
-      pos.move(net.minecraft.core.Direction.UP);
-      return pos.immutable();
+   private static  net.minecraft.core.BlockPos fixupSpawnHeight(ClientLevel level, net.minecraft.core.BlockPos spawnPos) {
+      return PreviewSpawnHelper.fixupSpawnHeight(level, spawnPos);
    }
 
-   private static boolean noCollisionNoLiquid(ClientLevel level, net.minecraft.core.BlockPos pos) {
-      return level.noCollision(
-         null,
-         net.minecraft.world.entity.EntityTypes.PLAYER
-            .getDimensions()
-            .makeBoundingBox(net.minecraft.world.phys.Vec3.atBottomCenterOf(pos)),
-         true
-      );
+   private static  boolean noCollisionNoLiquid(ClientLevel level, net.minecraft.core.BlockPos pos) {
+      return PreviewSpawnHelper.noCollisionNoLiquid(level, pos);
    }
 
    /** Must be called on the client thread. Blocks briefly while the server serialises chunks. */

@@ -10,5 +10,5 @@ public interface PieChartAccessor {
    String standardsettings$getCurrentPath();
 
    @Accessor("profilerTreePath")
-   void standardsettings$setCurrentPath(String var1);
+   void standardsettings$setCurrentPath(String path);
 }

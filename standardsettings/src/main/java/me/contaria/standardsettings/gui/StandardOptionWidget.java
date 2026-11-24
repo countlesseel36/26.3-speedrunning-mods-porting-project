@@ -13,6 +13,9 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 
+/**
+ * 设置项控件：把主控件与启用/禁用按钮组合成一行。
+ */
 public class StandardOptionWidget extends AbstractWidget implements ContainerEventHandler {
    private final StandardSetting<?> setting;
    private final AbstractWidget mainWidget;
@@ -32,6 +35,9 @@ public class StandardOptionWidget extends AbstractWidget implements ContainerEve
       this.setEnabled(setting.isEnabled());
    }
 
+   /**
+    * 启用/禁用整行控件。
+    */
    private void setEnabled(boolean enabled) {
       this.mainWidget.active = enabled;
       if (this.mainWidget instanceof EditBox) {
@@ -41,6 +47,9 @@ public class StandardOptionWidget extends AbstractWidget implements ContainerEve
       this.mainWidget.setMessage(this.setting.getText());
    }
 
+   /**
+    * 渲染该行控件。
+    */
    protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
       this.mainWidget.setPosition(this.getX(), this.getY());
       this.mainWidget.extractRenderState(graphics, mouseX, mouseY, a);
@@ -79,12 +88,18 @@ public class StandardOptionWidget extends AbstractWidget implements ContainerEve
       this.focused = focused;
    }
 
+   /**
+    * 处理点击。
+    */
    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
       // Dispatch to the option widget / enable toggle; AbstractWidget#mouseClicked would swallow
       // the click without doing anything, which made every StandardSettings option read-only.
       return ContainerEventHandler.super.mouseClicked(event, doubleClick);
    }
 
+   /**
+    * 处理释放。
+    */
    public boolean mouseReleased(MouseButtonEvent event) {
       return ContainerEventHandler.super.mouseReleased(event);
    }
@@ -93,6 +108,9 @@ public class StandardOptionWidget extends AbstractWidget implements ContainerEve
       return ContainerEventHandler.super.mouseDragged(event, dx, dy);
    }
 
+   /**
+    * 无障碍朗读文本。
+    */
    protected void updateWidgetNarration(NarrationElementOutput output) {
    }
 }

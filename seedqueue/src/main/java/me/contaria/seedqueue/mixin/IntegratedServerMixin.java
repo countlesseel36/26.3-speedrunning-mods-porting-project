@@ -1,13 +1,18 @@
 package me.contaria.seedqueue.mixin;
 
-import me.contaria.seedqueue.QueueEntry;
-import me.contaria.seedqueue.QueueServer;
+import me.contaria.seedqueue.queue.QueueEntry;
+import me.contaria.seedqueue.queue.QueueServer;
 import net.minecraft.client.server.IntegratedServer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
+import me.contaria.seedqueue.*;
+import me.contaria.seedqueue.queue.*;
+import me.contaria.seedqueue.preview.*;
+import me.contaria.seedqueue.wall.*;
+import me.contaria.seedqueue.render.*;
+import me.contaria.seedqueue.config.*;
 
-/** Tags each background integrated server with the queue entry it belongs to. */
-@Mixin(IntegratedServer.class)
+@Mixin({IntegratedServer.class})
 public abstract class IntegratedServerMixin implements QueueServer {
    @Unique
    private QueueEntry seedqueue$entry;

@@ -33,7 +33,7 @@ public abstract class MinecraftMixin {
    public abstract boolean isWindowActive();
 
    @Shadow
-   public abstract void pauseGame(boolean var1);
+   public abstract void pauseGame(boolean pause);
 
    @Inject(method = "doWorldLoad", at = @At("HEAD"))
    private void reset(

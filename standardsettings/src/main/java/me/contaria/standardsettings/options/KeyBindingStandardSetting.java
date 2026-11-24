@@ -13,6 +13,9 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button.Plain;
 import net.minecraft.network.chat.Component;
 
+/**
+ * 按键绑定类设置项。
+ */
 public class KeyBindingStandardSetting extends StandardSetting<Key> {
    private final KeyMapping keyBinding;
    private Key value;

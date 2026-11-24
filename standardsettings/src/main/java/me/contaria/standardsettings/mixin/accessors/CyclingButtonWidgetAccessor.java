@@ -10,5 +10,5 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface CyclingButtonWidgetAccessor {
    @Mutable
    @Accessor("displayState")
-   void standardsettings$setOptionTextOmitted(DisplayState var1);
+   void standardsettings$setOptionTextOmitted(DisplayState state);
 }

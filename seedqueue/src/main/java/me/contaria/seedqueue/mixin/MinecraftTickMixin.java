@@ -7,21 +7,25 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import me.contaria.seedqueue.*;
+import me.contaria.seedqueue.queue.*;
+import me.contaria.seedqueue.preview.*;
+import me.contaria.seedqueue.wall.*;
+import me.contaria.seedqueue.render.*;
+import me.contaria.seedqueue.config.*;
 
-/**
- * While a hand-over is waiting for the local player, the level already exists but {@code player} is
- * still null; ticking the game mode then throws inside {@code ensureHasSentCarriedItem}. Vanilla
- * avoids this because the receiving-level screen pauses the client tick, but the wall deliberately
- * skips that screen.
- */
-@Mixin(Minecraft.class)
+@Mixin({Minecraft.class})
 public abstract class MinecraftTickMixin {
-   @WrapOperation(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/multiplayer/MultiPlayerGameMode;tick()V"))
-   private void seedqueue$skipGameModeTickWhileJoining(MultiPlayerGameMode gameMode, Operation<Void> original) {
-      if (SeedQueue.suppressLoadingScreens && Minecraft.getInstance().player == null) {
-         return;
+   @WrapOperation(
+      method = {"tick"},
+      at = {@At(
+         value = "INVOKE",
+         target = "Lnet/minecraft/client/multiplayer/MultiPlayerGameMode;tick()V"
+      )}
+   )
+   private void seedqueue$skipGameModeTickWhileJoining(MultiPlayerGameMode multiPlayerGameMode, Operation<Void> operation) {
+      if (!SeedQueue.suppressLoadingScreens || Minecraft.getInstance().player != null) {
+         operation.call(new Object[]{multiPlayerGameMode});
       }
-
-      original.call(gameMode);
    }
 }

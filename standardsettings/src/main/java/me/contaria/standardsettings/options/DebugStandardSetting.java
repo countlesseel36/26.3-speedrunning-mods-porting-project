@@ -10,6 +10,9 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
+/**
+ * 调试屏幕条目类设置项。
+ */
 public class DebugStandardSetting extends StandardSetting<DebugScreenEntryStatus> {
    private final Identifier id;
    private DebugScreenEntryStatus value;

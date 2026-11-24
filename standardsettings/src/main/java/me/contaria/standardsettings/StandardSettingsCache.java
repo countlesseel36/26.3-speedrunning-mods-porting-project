@@ -5,6 +5,9 @@ import java.util.Objects;
 import java.util.Set;
 import me.contaria.standardsettings.options.StandardSetting;
 
+/**
+ * 按世界保存的设置缓存：记录每个设置在该世界的取值。
+ */
 public class StandardSettingsCache {
    private final String id;
    protected final Set<StandardSettingsCache.Entry<?>> cache;

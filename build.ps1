@@ -10,7 +10,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$jdk = 'C:\Program Files\Java\jdk-25\bin'
+$jdk = if ($env:JAVA_HOME) { Join-Path $env:JAVA_HOME 'bin' } else { 'C:\Program Files\Microsoft\jdk-25.0.5.102-hotspot\bin' }
 $javac = Join-Path $jdk 'javac.exe'
 $jarTool = Join-Path $jdk 'jar.exe'
 $mcJar = Join-Path $env:APPDATA '.minecraft\versions\26.3\26.3.jar'
@@ -29,7 +29,7 @@ $instanceMods = Join-Path $root 'minecraft\mods'
 if (Test-Path $instanceMods) {
     $extraLibs += Get-ChildItem $instanceMods -Filter 'sodium*.jar' -ErrorAction SilentlyContinue | ForEach-Object FullName
 if (Test-Path (Join-Path $root 'dist')) {
-  $extraLibs += Get-ChildItem (Join-Path $root 'dist') -Filter '*.jar' | ForEach-Object FullName
+  $extraLibs += Get-ChildItem (Join-Path $root 'dist') -Filter '*.jar' | Where-Object { -not $_.Name.EndsWith('-SeedQueue.jar') } | ForEach-Object FullName
 }
 }
 $moduleClasses = Get-ChildItem (Join-Path $root 'build') -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName 'classes') } | ForEach-Object { Join-Path $_.FullName 'classes' }

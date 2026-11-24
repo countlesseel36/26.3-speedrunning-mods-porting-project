@@ -9,23 +9,21 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Sodium's {@code renderLayer} throws "Global terrain uniforms have not been updated" when a frame
- * renders terrain without {@code setupTerrain} (this happens while a level hand-over or a quit is
- * transitioning). Skipping that one layer is harmless and avoids a hard crash.
- */
-@Mixin(SodiumWorldRenderer.class)
+@Mixin({SodiumWorldRenderer.class})
 public abstract class SodiumRenderLayerMixin {
    @Shadow
    private ClientLevel level;
-
    @Shadow
    private UniformBufferManager uniformBufferManager;
 
-   @Inject(method = "renderLayer", at = @At("HEAD"), cancellable = true)
-   private void seedqueue$skipStaleTerrain(CallbackInfo ci) {
+   @Inject(
+      method = {"renderLayer"},
+      at = {@At("HEAD")},
+      cancellable = true
+   )
+   private void seedqueue$skipStaleTerrain(CallbackInfo callback) {
       if (this.level == null || this.uniformBufferManager == null) {
-         ci.cancel();
+         callback.cancel();
       }
    }
 }

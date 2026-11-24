@@ -6,40 +6,33 @@ import net.fabricmc.loader.api.FabricLoader;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+import me.contaria.seedqueue.*;
 
-/** Enables the Sodium mixins only when Sodium is installed. */
 public final class SeedQueueMixinPlugin implements IMixinConfigPlugin {
    private boolean sodium;
 
-   @Override
-   public void onLoad(String mixinPackage) {
+   public void onLoad(String text) {
       this.sodium = FabricLoader.getInstance().isModLoaded("sodium");
    }
 
-   @Override
-   public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-      return !mixinClassName.contains(".mixin.sodium.") || this.sodium;
+   public boolean shouldApplyMixin(String text, String text2) {
+      return !text2.contains(".mixin.sodium.") || this.sodium;
    }
 
-   @Override
    public String getRefMapperConfig() {
       return null;
    }
 
-   @Override
-   public void acceptTargets(Set<String> myTargets, Set<String> otherTargets) {
+   public void acceptTargets(Set<String> set, Set<String> set2) {
    }
 
-   @Override
    public List<String> getMixins() {
       return null;
    }
 
-   @Override
-   public void preApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
+   public void preApply(String text, ClassNode classNode, String text2, IMixinInfo iMixinInfo) {
    }
 
-   @Override
-   public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
+   public void postApply(String text, ClassNode classNode, String text2, IMixinInfo iMixinInfo) {
    }
 }

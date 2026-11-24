@@ -11,6 +11,9 @@ import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
+/**
+ * 自定义设置：用 getter/setter 描述一个设置项，支持布尔与枚举工厂。
+ */
 public class CustomStandardSetting<T> extends StandardSetting<T> {
    private final Supplier<T> getter;
    private final Consumer<T> setter;

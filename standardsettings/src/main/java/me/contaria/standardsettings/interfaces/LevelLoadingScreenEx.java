@@ -1,7 +1,7 @@
 package me.contaria.standardsettings.interfaces;
 
 public interface LevelLoadingScreenEx {
-   void standardsettings$setLevelId(String var1);
+   void standardsettings$setLevelId(String levelId);
 
-   void standardsettings$setNewWorld(boolean var1);
+   void standardsettings$setNewWorld(boolean newWorld);
 }

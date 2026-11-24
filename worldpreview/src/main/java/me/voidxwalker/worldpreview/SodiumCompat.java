@@ -6,7 +6,8 @@ import net.minecraft.client.multiplayer.ClientLevel;
 
 /**
  * Soft Sodium compatibility. Sodium keeps its own section renderer and only creates its section
- * manager for the level that was passed to {@code SodiumWorldRenderer#setLevel}; without that it
+ * manager for the level that was passed to {
+      reportCapabilities();@code SodiumWorldRenderer#setLevel}; without that it
  * throws when the preview level reports dirty sections.
  */
 public final class SodiumCompat {
@@ -25,6 +26,7 @@ public final class SodiumCompat {
 
    /** Points Sodium's renderer at the preview level. Returns true when Sodium is driving sections. */
    public static boolean setup(ClientLevel level) {
+      reportCapabilities();
       if (!PRESENT) {
          return false;
       }
@@ -314,5 +316,32 @@ public final class SodiumCompat {
 
    public static boolean isDriving() {
       return initialized;
+   }
+
+   /** 启动时报告 Sodium 反射钩子的可用性，便于定位版本不兼容。 */
+   private static boolean capabilitiesReported;
+
+   static void reportCapabilities() {
+      if (capabilitiesReported) {
+         return;
+      }
+
+      capabilitiesReported = true;
+      java.util.List<String> missing = new java.util.ArrayList<>();
+
+      if (setupTerrainMethod == null) missing.add("setupTerrain");
+      if (createViewportMethod == null) missing.add("createViewport");
+      if (getFogParametersMethod == null) missing.add("getFogParameters");
+      if (pumpMethod == null) missing.add("processChunkEvents");
+      if (chunkTrackerGet == null) missing.add("chunkTracker");
+      if (onChunkStatusAdded == null) missing.add("onChunkStatusAdded");
+      if (scheduleRebuildForChunk == null) missing.add("scheduleRebuildForChunk");
+      if (terrainCompleteMethod == null) missing.add("isTerrainRenderComplete");
+
+      if (missing.isEmpty()) {
+         WorldPreview.LOGGER.info("[preview] sodium hooks resolved");
+      } else {
+         WorldPreview.LOGGER.warn("[preview] sodium hooks missing: {}", missing);
+      }
    }
 }

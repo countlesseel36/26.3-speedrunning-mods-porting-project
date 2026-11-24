@@ -12,6 +12,9 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.CycleButton.DisplayState;
 import net.minecraft.network.chat.Component;
 
+/**
+ * 包装原版 SimpleOption 的设置项。
+ */
 public class SimpleOptionStandardSetting<T> extends StandardSetting<T> {
    protected final OptionInstance<T> option;
    protected final OptionInstance<T> copy;

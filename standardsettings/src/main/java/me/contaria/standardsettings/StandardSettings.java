@@ -15,6 +15,9 @@ import net.minecraft.client.resources.language.LanguageManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+/**
+ * 标准设置入口：加载/应用配置、按世界缓存、加入世界时重放设置。
+ */
 public class StandardSettings {
    public static final Logger LOGGER = LogManager.getLogger();
    public static final boolean HAS_SODIUM = FabricLoader.getInstance().isModLoaded("sodium");
@@ -24,7 +27,13 @@ public class StandardSettings {
    public static boolean onWorldJoinPending;
    public static boolean autoF3EscPending;
 
+   /**
+    * 恢复所有设置为默认值。
+    */
    public static void reset() {
+      /**
+       * 标准设置是否启用。
+       */
       if (!isEnabled()) {
          LOGGER.info("StandardSettings disabled, skipping reset");
          return;
@@ -110,6 +119,9 @@ public class StandardSettings {
       return !java.nio.file.Files.exists(dir.resolve("standardoptions.txt"));
    }
 
+   /**
+    * 加入世界时应用按世界保存的设置。
+    */
    public static void onWorldJoin() {
       onWorldJoinPending = false;
 
@@ -184,6 +196,9 @@ public class StandardSettings {
    }
 
 
+   /**
+    * 把当前配置应用到客户端选项。
+    */
    public static void updateSettings() {
       Minecraft client = Minecraft.getInstance();
       Window window = client.getWindow();
@@ -215,6 +230,9 @@ public class StandardSettings {
       }
    }
 
+   /**
+    * 为当前世界创建设置缓存。
+    */
    public static void createCache() {
       if (lastWorld != null && (settingsCache == null || !lastWorld.equals(settingsCache.getId()))) {
          settingsCache = new StandardSettingsCache(lastWorld);
@@ -222,6 +240,9 @@ public class StandardSettings {
       }
    }
 
+   /**
+    * 加载指定世界的设置缓存。
+    */
    public static void loadCache(String worldName) {
       if (settingsCache != null && worldName.equals(settingsCache.getId())) {
          settingsCache.load();
@@ -235,6 +256,9 @@ public class StandardSettings {
       autoF3EscPending = false;
    }
 
+   /**
+    * 把设置写入世界文件。
+    */
    public static void saveToWorldFile(String worldName) {
       List<String> options = new ArrayList<>();
 

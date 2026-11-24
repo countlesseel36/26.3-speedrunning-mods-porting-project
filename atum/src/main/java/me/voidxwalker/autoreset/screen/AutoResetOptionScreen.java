@@ -43,23 +43,23 @@ public class AutoResetOptionScreen extends Screen {
       this.addRenderableWidget(
          CycleButton.<Integer>builder(Atum::difficultyName, this.difficulty)
             .withValues(List.of(-1, 0, 1, 2, 3))
-            .create(centerX - 155, 100, 150, 20, Component.translatable("options.difficulty"), (button, value) -> this.difficulty = value)
+            .create(centerX - 155, 100, 150, 20, Component.translatable("options.difficulty"), (button, value) -> { this.difficulty = value; Atum.difficulty = value; Atum.save(); Atum.notifySettingsChanged(); })
       );
 
       this.addRenderableWidget(
          CycleButton.<Integer>builder(Atum::generatorName, this.generatorType)
             .withValues(List.of(0, 1, 2, 3, 4))
-            .create(centerX + 5, 100, 150, 20, Component.translatable("selectWorld.mapType"), (button, value) -> this.generatorType = value)
+            .create(centerX + 5, 100, 150, 20, Component.translatable("selectWorld.mapType"), (button, value) -> { this.generatorType = value; Atum.generatorType = value; Atum.save(); Atum.notifySettingsChanged(); })
       );
 
       this.addRenderableWidget(
          CycleButton.onOffBuilder(this.structures)
-            .create(centerX - 155, 130, 150, 20, Component.translatable("selectWorld.mapFeatures"), (button, value) -> this.structures = value)
+            .create(centerX - 155, 130, 150, 20, Component.translatable("selectWorld.mapFeatures"), (button, value) -> { this.structures = value; Atum.structures = value; Atum.save(); Atum.notifySettingsChanged(); })
       );
 
       this.addRenderableWidget(
          CycleButton.onOffBuilder(this.bonusChest)
-            .create(centerX + 5, 130, 150, 20, Component.translatable("selectWorld.bonusItems"), (button, value) -> this.bonusChest = value)
+            .create(centerX + 5, 130, 150, 20, Component.translatable("selectWorld.bonusItems"), (button, value) -> { this.bonusChest = value; Atum.bonusChest = value; Atum.save(); Atum.notifySettingsChanged(); })
       );
 
       this.addRenderableWidget(
