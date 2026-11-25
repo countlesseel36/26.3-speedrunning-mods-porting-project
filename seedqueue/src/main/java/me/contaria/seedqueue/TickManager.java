@@ -41,6 +41,14 @@ import static me.contaria.seedqueue.SeedQueue.*;
  * 由 MinecraftTickMixin 调用 SeedQueue.tick，再委派到这里执行。
  */
 public final class TickManager {
+   /** 是否曾经进入过世界（用于检测断开）。 */
+   private static boolean hadLevel;
+
+   /** 加入世界后是否已安排一次背包同步。 */
+   private static boolean inventoryResyncPending;
+   /** 背包同步延迟计时（40 tick）。 */
+   private static int inventoryResyncTicks;
+
 
    private TickManager() {
    }
@@ -459,9 +467,108 @@ public final class TickManager {
       }
 
 
+      // 加入世界后延迟 40 tick 强制同步一次背包：快速加入时客户端容器状态可能不同步，
+      // 表现为同类物品不合并/槽位显示错乱，重新登录后恢复。
+      if (minecraft.player == null) {
+         inventoryResyncPending = false;
+         inventoryResyncTicks = 0;
+      } else if (liveEntry() != null && Boolean.parseBoolean(System.getProperty("seedqueue.inventoryResync", "true"))) {
+         if (!inventoryResyncPending) {
+            inventoryResyncPending = true;
+            inventoryResyncTicks = 0;
+         } else if (inventoryResyncTicks >= 0 && ++inventoryResyncTicks >= 40) {
+            if (inventoryResyncTicks < 400) {
+               inventoryResyncTicks = -(inventoryResyncTicks + 60);
+            } else {
+               inventoryResyncTicks = -1;
+            }
+            var server = minecraft.getSingleplayerServer();
+
+            if (server != null) {
+               server.execute(() -> {
+                  for (var player : server.getPlayerList().getPlayers()) {
+                     player.inventoryMenu.broadcastFullState();
+                     player.containerMenu.broadcastFullState();
+                  }
+
+                  LOGGER.info("[seedqueue] resynced player inventory after join");
+
+                  if (Boolean.getBoolean("seedqueue.inventoryDebug")) {
+                     for (var player : server.getPlayerList().getPlayers()) {
+                        var inventory = player.getInventory();
+
+                        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+                           var stack = inventory.getItem(slot);
+
+                           if (!stack.isEmpty()) {
+                              LOGGER.info("[seedqueue] inv slot {}: {} x{}", slot, stack.getItem(), stack.getCount());
+                           }
+                        }
+                     }
+                  }
+               });
+            }
+         }
+      }
+
+      // 断开世界后释放客户端对旧 ClientLevel 的引用：levelExtractor / Camera / 粒子引擎 /
+      // Sodium 都持有世界对象，不主动清空时旧世界（含渲染 section）要等很久才能被 GC 回收。
+      if (minecraft.level != null) {
+         hadLevel = true;
+      } else if (hadLevel) {
+         hadLevel = false;
+         releaseClosedWorldRefs(minecraft);
+      }
+
       sessionDiagnostics();
+      DiagnosticsManager.logHeapTrend();
       memoryGuard();
    }
+
+   /**
+    * 断开世界后释放客户端层面对旧世界的引用。
+    */
+   private static void releaseClosedWorldRefs(Minecraft minecraft) {
+      int released = 0;
+
+      try {
+         minecraft.levelExtractor.setLevel(null);
+         released++;
+      } catch (Throwable error) {
+         LOGGER.debug("[seedqueue] levelExtractor release failed", error);
+      }
+
+      try {
+         minecraft.gameRenderer.mainCamera().setLevel(null);
+         released++;
+      } catch (Throwable error) {
+         LOGGER.debug("[seedqueue] camera release failed", error);
+      }
+
+      try {
+         minecraft.particleEngine.setLevel(null);
+         released++;
+      } catch (Throwable error) {
+         LOGGER.debug("[seedqueue] particle engine release failed", error);
+      }
+
+      try {
+         Class<?> sodiumCompat = Class.forName("me.voidxwalker.worldpreview.SodiumCompat");
+         sodiumCompat.getMethod("release").invoke(null);
+         released++;
+      } catch (Throwable error) {
+         LOGGER.debug("[seedqueue] sodium level release failed", error);
+      }
+
+      try {
+         me.contaria.seedqueue.render.SodiumLevelCache.sweep();
+      } catch (Throwable error) {
+         LOGGER.debug("[seedqueue] sodium cache sweep failed", error);
+      }
+
+      LOGGER.info("[seedqueue] released closed-world references ({})", released);
+   }
+
    static void keepWallQueueFilled(Minecraft minecraft) {
       if (!heapPressure && QueueConfig.autoQueue && canQueueAnother()) {
          refillQueue(minecraft);
@@ -472,7 +579,7 @@ public final class TickManager {
       boolean canAutoQueue = !onWall && (minecraft.gui.screen() instanceof TitleScreen || minecraft.level != null);
       long pendingCount = ENTRIES.stream().filter(arg -> !arg.transferred).count();
       int maxSlots = Math.max(1, QueueConfig.rows * QueueConfig.columns);
-      if (canAutoQueue && pendingCount < (long)queueSize() && pendingCount < (long)maxSlots && QueueConfig.autoQueue && canQueueAnother()) {
+      if (canAutoQueue && pendingCount < (long)effectiveQueueSize() && pendingCount < (long)maxSlots && QueueConfig.autoQueue && canQueueAnother()) {
          QueueEntry entry = new QueueEntry(nextEntryNumber++, nextQueueSeed());
          ENTRIES.add(entry);
          LOGGER.info("[seedqueue] queued entry #{} (seed {})", entry.number, entry.seed);

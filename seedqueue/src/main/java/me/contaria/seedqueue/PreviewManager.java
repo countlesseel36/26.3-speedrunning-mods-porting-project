@@ -6,6 +6,7 @@ import me.voidxwalker.worldpreview.WorldPreviewProperties;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import me.contaria.seedqueue.*;
+import me.contaria.seedqueue.render.SodiumLevelCache;
 import me.contaria.seedqueue.queue.*;
 import me.contaria.seedqueue.preview.*;
 import me.contaria.seedqueue.wall.*;
@@ -174,6 +175,36 @@ public final class PreviewManager {
             }
          });
          WorldPreview.restoreMainTarget(minecraft);
+      }
+   }
+
+   /**
+    * 进入世界/内存紧张时释放当前不需要的预览世界（墙不可见时所有卡片预览都不需要），
+    * 返回墙后 PreviewManager 会按需重新构建。
+    */
+   static void releaseHiddenPreviews(String reason) {
+      int released = 0;
+
+      for (QueueEntry entry : ENTRIES) {
+         if (entry == liveEntry || entry.selected || entry.transferred || entry.externalPreview == null) {
+            continue;
+         }
+
+         try {
+            if (entry.externalPreview.level != null) {
+               SodiumLevelCache.evictLater(entry.externalPreview.level);
+            }
+         } catch (Throwable error) {
+            SeedQueue.LOGGER.debug("[seedqueue] ignored exception", error);
+         }
+
+         entry.externalPreview = null;
+         released++;
+      }
+
+      if (released > 0) {
+         evictPreviewCaches(reason);
+         SeedQueue.LOGGER.info("[seedqueue] released {} hidden preview levels ({})", released, reason);
       }
    }
 }

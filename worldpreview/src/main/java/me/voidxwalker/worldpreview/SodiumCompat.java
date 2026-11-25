@@ -60,6 +60,13 @@ public final class SodiumCompat {
       currentLevel = level;
    }
 
+   /**
+    * 断开世界时释放对 ClientLevel 的静态引用，避免旧世界无法被 GC 回收。
+    */
+   public static void release() {
+      currentLevel = null;
+   }
+
    public static void restore(Minecraft minecraft) {
       if (!PRESENT || !initialized) {
          return;

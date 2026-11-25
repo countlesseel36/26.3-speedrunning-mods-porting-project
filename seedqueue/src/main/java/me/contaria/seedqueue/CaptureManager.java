@@ -232,7 +232,11 @@ public final class CaptureManager {
       boolean flag = entry != null && PreviewState.frameSwapEntry == entry && WorldPreview.isActive();
       PreviewState.unbind();
       stopPreviewCycle(minecraft);
-      if (!flag && WorldPreview.isActive()) {
+
+      // 进入世界后不再做“每帧把 minecraft.player/level 换成预览对象”的交换：
+      // 登录/容器同步窗口内保留交换可能让同步包作用到预览玩家上，导致客户端背包与服务端不一致。
+      // 出生点对齐仍然使用 entry 里保存的 externalPreview/renderProperties，不依赖这个交换。
+      if (WorldPreview.isActive()) {
          WorldPreview.deactivateExternal();
       }
 

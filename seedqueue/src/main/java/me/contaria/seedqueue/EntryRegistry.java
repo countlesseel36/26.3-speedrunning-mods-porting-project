@@ -52,7 +52,8 @@ public final class EntryRegistry {
     * 按上限回收多余的冻结实例。
     */
    static void enforceParkedLimit() {
-      int count = Math.max(1, queueSize());
+      int count = Math.max(1, effectiveQueueSize());
+
       int count2 = parkedCount();
       if (count2 > count) {
          java.util.ArrayList<QueueEntry> list = new java.util.ArrayList<>();

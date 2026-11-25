@@ -14,11 +14,11 @@
 
 | 模组 / Mod | 版本 / Version | 说明 / Description |
 | --- | --- | --- |
-| SeedQueue | `1.1.0-rc.1+26.3` | 后台生成世界 + 墙界面预览 / Background world generation + wall previews |
-| WorldPreview | `6.4.0-rc.1+26.3` | 预览渲染管线 / Preview rendering pipeline |
+| SeedQueue | `1.1.0-rc.2+26.3` | 后台生成世界 + 墙界面预览 / Background world generation + wall previews |
+| WorldPreview | `6.4.0-rc.2+26.3` | 预览渲染管线 / Preview rendering pipeline |
 | SpeedrunAPI | `2.2.0-rc.1+26.3` | 配置界面框架 / Config screen framework |
 | StandardSettings | `2.4.0-rc.1+26.3` | 进世界应用预设选项 / Applies preset options on world join |
-| Atum | `1.5.0-rc.1+26.3` | 自动重置 / Auto reset |
+| Atum | `1.5.0-rc.2+26.3` | 自动重置 / Auto reset |
 | FastReset | `1.7.0-rc.1+26.3` | 秒退到标题 / Instant quit to title |
 
 可选 / Optional: `SeedQueue-LockedPool.zip`（锁定池资源包 / locked-pool resource pack）

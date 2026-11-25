@@ -56,7 +56,7 @@ public final class QueueManager {
                   queueSize(),
                   Integer.getInteger("seedqueue.benchmarkConcurrency", QueueConfig.benchmarkConcurrency > 0 ? QueueConfig.benchmarkConcurrency : queueSize())
                )
-               : queueSize();
+               : effectiveQueueSize();
             if (value < (long)count3) {
                QueueEntry entry = new QueueEntry(nextEntryNumber++, nextQueueSeed());
                ENTRIES.add(entry);
@@ -164,6 +164,12 @@ public final class QueueManager {
                   liveEntry = entry;
                   joinedFromWall = true;
                   wallShown = false;
+
+                  try {
+                     PreviewManager.releaseHiddenPreviews("entered world");
+                  } catch (Throwable error) {
+                     SeedQueue.LOGGER.debug("[seedqueue] ignored exception", error);
+                  }
 
                   try {
                      SodiumLevelCache.evictAllExcept(Minecraft.getInstance().level);

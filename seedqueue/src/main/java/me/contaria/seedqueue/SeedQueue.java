@@ -135,6 +135,8 @@ public final class SeedQueue implements ClientModInitializer {
    static long lastGenDiagAt;
    static volatile boolean heapPressure;
    static long lastHeapCheckAt;
+   /** 堆压力解除后的补充冷却结束时间。 */
+   static volatile long refillCooldownUntil;
    static final ConcurrentHashMap<Integer, long[]> GENERATION_PROGRESS = new ConcurrentHashMap<>();
    static long lastQueueAt;
    static final ConcurrentLinkedQueue<Path> PENDING_DELETES = new ConcurrentLinkedQueue<>();
@@ -325,6 +327,25 @@ public final class SeedQueue implements ClientModInitializer {
 
    static boolean integrate() {
       return TickManager.integrate();
+   }
+
+
+   /**
+    * 补充队列时实际使用的容量：堆压力中压到 3，压力解除后的 60 秒冷却内压到 4，
+    * 避免刚缓存回收完就立刻补满再次触发压力。
+    */
+   static int effectiveQueueSize() {
+      int configured = queueSize();
+
+      if (heapPressure) {
+         return Math.min(configured, 3);
+      }
+
+      if (System.currentTimeMillis() < refillCooldownUntil) {
+         return Math.min(configured, 4);
+      }
+
+      return configured;
    }
 
    static int queueSize() {

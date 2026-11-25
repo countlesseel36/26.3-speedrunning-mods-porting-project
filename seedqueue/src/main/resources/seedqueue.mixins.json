@@ -5,6 +5,9 @@
   "compatibilityLevel": "JAVA_21",
   "plugin": "me.contaria.seedqueue.SeedQueueMixinPlugin",
   "client": [
+    "ClientContainerDebugMixin",
+    "ServerPlayerMenuResyncMixin",
+    "ContainerClickDebugMixin",
     "SeedQueueMixin",
     "ScreenInvoker",
     "TitleScreenMixin",

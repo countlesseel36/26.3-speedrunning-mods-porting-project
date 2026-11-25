@@ -70,6 +70,9 @@ public class AutoResetOptionScreen extends Screen {
             Atum.structures = this.structures;
             Atum.bonusChest = this.bonusChest;
             Atum.save();
+            // 种子也属于世界设置：保存后必须通知 SeedQueue 重建队列，
+            // 否则已生成的卡片仍是用旧种子（随机）生成的。
+            Atum.notifySettingsChanged();
             this.minecraft.gui.setScreen(this.parent);
          }).bounds(centerX - 155, this.height - 28, 150, 20).build()
       );

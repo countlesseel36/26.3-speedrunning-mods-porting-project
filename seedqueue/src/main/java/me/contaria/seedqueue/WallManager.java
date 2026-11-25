@@ -259,6 +259,15 @@ public final class WallManager {
             for (QueueEntry entry : ENTRIES) {
                if (entry.externalPreview != null) {
                   entry.externalPreview.invalidateSections();
+
+                  try {
+                     if (entry.externalPreview.level != null) {
+                        SodiumLevelCache.evictLater(entry.externalPreview.level);
+                     }
+                  } catch (Throwable ignored) {
+                  }
+
+                  entry.externalPreview = null;
                }
             }
 

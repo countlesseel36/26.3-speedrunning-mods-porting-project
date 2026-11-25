@@ -36,6 +36,39 @@ public final class DiagnosticsManager {
          }
       }
    }
+
+   /** 上一次堆趋势日志时间。 */
+   private static long lastHeapTrendAt;
+
+   /**
+    * 每 60 秒记录一次堆占用，覆盖世界内/墙上两种状态，便于判断是否持续增长。
+    */
+   static void logHeapTrend() {
+      if (!Boolean.parseBoolean(System.getProperty("seedqueue.heapLog", "true"))) {
+         return;
+      }
+
+      long now = System.currentTimeMillis();
+
+      if (now - lastHeapTrendAt < 60000L) {
+         return;
+      }
+
+      lastHeapTrendAt = now;
+      Runtime runtime = Runtime.getRuntime();
+      long used = (runtime.totalMemory() - runtime.freeMemory()) / 1048576L;
+      long max = runtime.maxMemory() / 1048576L;
+      LOGGER.info(
+         "[seedqueue] heap trend: {}MB/{}MB ({}%), entries={}, parked={}, inWorld={}",
+         used,
+         max,
+         max > 0 ? used * 100L / max : 0L,
+         ENTRIES.size(),
+         parkedCount(),
+         net.minecraft.client.Minecraft.getInstance().level != null
+      );
+   }
+
    /**
     * 输出当前堆内存使用情况。
     */
@@ -53,17 +86,23 @@ public final class DiagnosticsManager {
     */
    static void memoryGuard() {
       long value = System.currentTimeMillis();
-      if (value - lastHeapCheckAt >= 30000L) {
+      if (value - lastHeapCheckAt >= 10000L) {
          lastHeapCheckAt = value;
          Runtime runtime = Runtime.getRuntime();
          long value2 = runtime.totalMemory() - runtime.freeMemory();
          long value3 = runtime.maxMemory();
          double ratio = value3 > 0L ? (double)value2 / (double)value3 : 0.0;
-         if (!heapPressure && ratio > 0.8) {
+         long usedMb = value2 / 1048576L;
+         long maxMb = value3 / 1048576L;
+         int percent = (int)Math.round(ratio * 100.0);
+
+         if (!heapPressure && ratio > 0.75) {
             heapPressure = true;
-            LOGGER.warn("[seedqueue] heap pressure {:.0f}%, releasing previews and parked servers", ratio * 100.0);
+            refillCooldownUntil = 0L;
+            LOGGER.warn("[seedqueue] heap pressure {}% ({}MB/{}MB), releasing previews and parked servers", percent, usedMb, maxMb);
 
             try {
+               PreviewManager.releaseHiddenPreviews("heap pressure");
                evictPreviewCaches("heap pressure");
             } catch (Throwable error) {
                LOGGER.warn("[seedqueue] preview eviction under heap pressure failed", error);
@@ -82,9 +121,16 @@ public final class DiagnosticsManager {
                   count--;
                }
             }
-         } else if (heapPressure && ratio < 0.7) {
+         } else if (heapPressure && ratio < 0.6) {
             heapPressure = false;
-            LOGGER.info("[seedqueue] heap pressure eased ({:.0f}%), refill resumed", ratio * 100.0);
+            refillCooldownUntil = System.currentTimeMillis() + 60000L;
+            LOGGER.info(
+               "[seedqueue] heap pressure eased ({}%, {}MB/{}MB), refill cooldown 60s (effective queue size {})",
+               percent,
+               usedMb,
+               maxMb,
+               effectiveQueueSize()
+            );
          }
       }
    }

@@ -85,3 +85,10 @@ java -Dseedqueue.memLog=true -Dseedqueue.queueSize=6 ...
 
 - 与 `config/seedqueue.json` 同名的开关会覆盖配置值；
 - 诊断类开关只在排障时开启。
+
+## SeedQueue 背包同步诊断
+
+| 参数 | 默认 | 说明 |
+| --- | --- | --- |
+| `-Dseedqueue.inventoryDebug=true` | false | 记录服务端点击/槽位比较、客户端容器同步包、点击后结果 |
+| `-Dseedqueue.inventoryResync=false` | true | **关闭**加入世界后与开容器时的强制全量同步，用于复现“同类物品不合并”问题 |

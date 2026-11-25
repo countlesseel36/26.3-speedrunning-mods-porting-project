@@ -51,38 +51,124 @@ public final class LifecycleManager {
       startExitWatchdog();
       LOGGER.info("[seedqueue] shut down background queue");
    }
+   /**
+    * 退出看门狗：关机后若仍有线程存活则兜底结束 JVM。
+    * 只剩空闲的第三方/原版线程池线程时不再刷 WARN 与堆栈，只记录一条 INFO。
+    */
    static void startExitWatchdog() {
-      if (Boolean.parseBoolean(System.getProperty("seedqueue.exitWatchdog", "true"))) {
-         long value = Math.max(1000L, Long.getLong("seedqueue.exitWatchdogMs", 4000L));
-         Thread thread = new Thread(() -> {
+      if (!Boolean.parseBoolean(System.getProperty("seedqueue.exitWatchdog", "true"))) {
+         return;
+      }
+
+      long value = Math.max(1000L, Long.getLong("seedqueue.exitWatchdogMs", 4000L));
+      Thread thread = new Thread(() -> {
+         try {
+            Thread.sleep(value);
+         } catch (InterruptedException interruptedException) {
+            return;
+         }
+
+         java.util.List<Thread> critical = new java.util.ArrayList<>();
+         java.util.List<Thread> idlePools = new java.util.ArrayList<>();
+         java.util.Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
+
+         for (var entry : traces.entrySet()) {
+            Thread candidate = entry.getKey();
+
+            if (!candidate.isAlive() || candidate.isDaemon() || "DestroyJavaVM".equals(candidate.getName())) {
+               continue;
+            }
+
+            if (isIdleWorkerPool(candidate, entry.getValue())) {
+               idlePools.add(candidate);
+            } else {
+               critical.add(candidate);
+            }
+         }
+
+         if (critical.isEmpty()) {
+            // 给空闲线程池一点时间自行退出（例如 Sodium 正在停止 worker）
             try {
-               Thread.sleep(value);
-            } catch (InterruptedException interruptedException) {
+               Thread.sleep(2000L);
+            } catch (InterruptedException ignored) {
                return;
             }
 
-            try {
-               for (Entry entry : Thread.getAllStackTraces().entrySet()) {
-                  Thread thread2 = (Thread)entry.getKey();
-                  if (!thread2.isDaemon() && thread2.isAlive()) {
-                     LOGGER.warn("[seedqueue] still alive: {} ({})", thread2.getName(), thread2.getState());
-                     StackTraceElement[] elements = (StackTraceElement[])entry.getValue();
+            java.util.List<Thread> stillIdle = new java.util.ArrayList<>();
 
-                     for (int i = 0; i < Math.min(18, elements.length); i++) {
-                        LOGGER.warn("[seedqueue]   at {}", elements[i]);
-                     }
-                  }
+            for (var entry : Thread.getAllStackTraces().entrySet()) {
+               Thread candidate = entry.getKey();
+
+               if (candidate.isAlive() && !candidate.isDaemon()
+                  && !"DestroyJavaVM".equals(candidate.getName())
+                  && isIdleWorkerPool(candidate, entry.getValue())) {
+                  stillIdle.add(candidate);
                }
-            } catch (Throwable error) {
-         SeedQueue.LOGGER.debug("[seedqueue] ignored exception", error);
+            }
+
+            if (!stillIdle.isEmpty()) {
+               LOGGER.info("[seedqueue] shutdown complete; only idle worker pools remain ({}), halting quietly", stillIdle.size());
+
+               if (Boolean.parseBoolean(System.getProperty("seedqueue.exitWatchdogHalt", "true"))) {
+                  Runtime.getRuntime().halt(0);
+               }
+            }
+
+            return;
+         }
+
+         for (Thread candidate : critical) {
+            LOGGER.warn("[seedqueue] still alive: {} ({})", candidate.getName(), candidate.getState());
+            StackTraceElement[] elements = traces.get(candidate);
+
+            if (elements != null) {
+               for (int i = 0; i < Math.min(18, elements.length); i++) {
+                  LOGGER.warn("[seedqueue]   at {}", elements[i]);
+               }
+            }
+         }
+
+         LOGGER.warn("[seedqueue] the client is still running {}ms after shutdown, halting the JVM", value);
+         Runtime.getRuntime().halt(0);
+      }, "SeedQueue exit watchdog");
+      thread.setDaemon(true);
+      thread.start();
+   }
+   /**
+    * 判断线程是否只是空闲的线程池 worker（LinkedBlockingQueue.take / ForkJoinPool 等待任务）。
+    */
+   private static boolean isIdleWorkerPool(Thread thread, StackTraceElement[] stack) {
+      String name = thread.getName();
+
+      if (!name.startsWith("pool-") && !name.startsWith("ForkJoinPool")) {
+         return false;
       }
 
-            LOGGER.warn("[seedqueue] the client is still running {}ms after shutdown, halting the JVM", value);
-            Runtime.getRuntime().halt(0);
-         }, "SeedQueue exit watchdog");
-         thread.setDaemon(true);
-         thread.start();
+      Thread.State state = thread.getState();
+
+      if (state != Thread.State.WAITING && state != Thread.State.TIMED_WAITING) {
+         return false;
       }
+
+      for (StackTraceElement element : stack) {
+         String className = element.getClassName();
+         String methodName = element.getMethodName();
+
+         if ("java.util.concurrent.LinkedBlockingQueue".equals(className) && "take".equals(methodName)) {
+            return true;
+         }
+
+         if (className.startsWith("java.util.concurrent.ForkJoinPool")
+            && ("awaitWork".equals(methodName) || "getTask".equals(methodName) || "managedBlock".equals(methodName))) {
+            return true;
+         }
+
+         if ("java.util.concurrent.ThreadPoolExecutor".equals(className) && "getTask".equals(methodName)) {
+            return true;
+         }
+      }
+
+      return false;
    }
    /**
     * 运行期看门狗：检测卡顿并输出线程栈。

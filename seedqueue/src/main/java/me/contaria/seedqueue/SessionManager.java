@@ -15,6 +15,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Util;
 import net.minecraft.world.level.gamerules.GameRules;
 import me.contaria.seedqueue.*;
+import me.contaria.seedqueue.render.SodiumLevelCache;
 import me.contaria.seedqueue.queue.*;
 import me.contaria.seedqueue.preview.*;
 
@@ -64,6 +65,7 @@ public final class SessionManager {
              * 把玩家对齐到预览展示的出生点。
              */
             alignPlayerToPreviewedSpawn(PreviewState.handoffPreviewEntry, minecraft);
+            releaseHandoffPreview(PreviewState.handoffPreviewEntry);
             LOGGER.info("[seedqueue] hand-off complete after {} ticks (preview released)", handoffTicks);
             PreviewState.handoffPreviewEntry = null;
             joinInProgress = false;
@@ -74,6 +76,28 @@ public final class SessionManager {
          }
       }
    }
+   /**
+    * 进入世界后释放预览用的 ClientLevel/实体，避免世界内长期持有整份预览世界。
+    */
+   static void releaseHandoffPreview(QueueEntry entry) {
+      if (entry == null || entry.externalPreview == null) {
+         return;
+      }
+
+      try {
+         var level = entry.externalPreview.level;
+
+         if (level != null) {
+            SodiumLevelCache.evictLater(level);
+         }
+      } catch (Throwable error) {
+         SeedQueue.LOGGER.debug("[seedqueue] ignored exception", error);
+      }
+
+      entry.externalPreview = null;
+      SeedQueue.LOGGER.info("[seedqueue] released the hand-off preview level");
+   }
+
    /**
     * 校准/读取客户端的 tick 计时字段。
     */

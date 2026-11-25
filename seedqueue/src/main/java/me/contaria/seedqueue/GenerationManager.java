@@ -26,7 +26,7 @@ public final class GenerationManager {
       QueueExecutors.update(flag);
       boolean flag2 = QueueConfig.resumeOnFilledQueue
          && !ENTRIES.isEmpty()
-         && ENTRIES.size() >= queueSize()
+         && ENTRIES.size() >= effectiveQueueSize()
          && ENTRIES.stream()
             .allMatch(
                arg -> arg.state == QueueEntry.State.READY
@@ -173,7 +173,7 @@ public final class GenerationManager {
     * 队列是否已满。
     */
    public static boolean queueIsFull() {
-      return !ENTRIES.isEmpty() && ENTRIES.size() >= queueSize();
+      return !ENTRIES.isEmpty() && ENTRIES.size() >= effectiveQueueSize();
    }
    /**
     * 是否还可以再排入一个实例。
